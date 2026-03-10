@@ -30,11 +30,26 @@ def register_visitor(payload: VisitorRegister):
         rand = random.randint(1000, 9999)
         visit_id = f"VIS-{today}-{rand}"
 
-        data = payload.model_dump()
-        data["id"] = visit_id
-        data["status"] = "pending"
-
-        supabase.table("visitors").insert(data).execute()
+        db_insert(
+            "visitors",
+            {
+                "id": visit_id,
+                "name": payload.name,
+                "email": payload.email,
+                "phone": payload.phone,
+                "company": payload.company,
+                "department": payload.department,
+                "visitor_type": payload.visitor_type,
+                "host_name": payload.host_name,
+                "host_designation": payload.host_designation,
+                "purpose": payload.purpose,
+                "visit_date": payload.visit_date,
+                "time_slot": payload.time_slot,
+                "notes": payload.notes,
+                "industry": payload.industry,
+                "status": "pending",
+            },
+        )
 
         return {"success": True, "visit_id": visit_id}
     except Exception as e:
@@ -44,8 +59,7 @@ def register_visitor(payload: VisitorRegister):
 @router.get("/visitor/{visit_id}")
 def get_visitor(visit_id: str):
     try:
-        res = supabase.table("visitors").select("*").eq("id", visit_id).execute()
-        rows = getattr(res, "data", None) or []
+        rows = db_select("visitors", {"id": f"eq.{visit_id}"}) or []
 
         if not rows:
             raise HTTPException(status_code=404, detail="Visitor not found")
@@ -70,7 +84,7 @@ class VisitorUpdate(BaseModel):
 def update_visitor(visit_id: str, payload: VisitorUpdate):
     try:
         update_data = {k: v for k, v in payload.model_dump().items() if v is not None}
-        supabase.table("visitors").update(update_data).eq("id", visit_id).execute()
+        db_update("visitors", "id", visit_id, update_data)
         return {"success": True}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -80,30 +94,44 @@ class PhoneCheck(BaseModel):
     phone: str
 
 
+def _parse_iso_datetime(value: str) -> datetime:
+    s = str(value).strip()
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(tz=None).replace(tzinfo=None)
+    return dt
+
+
 @router.post("/check-return")
 def check_return(payload: PhoneCheck):
     try:
-        res = (
-            supabase.table("visitors")
-            .select("*")
-            .eq("phone", payload.phone)
-            .order("created_at", desc=True)
-            .limit(1)
-            .execute()
-        )
-        rows = getattr(res, "data", None) or []
+        rows = db_select("visitors", {"phone": f"eq.{payload.phone}"}) or []
 
         if not rows:
             return {"is_new": True}
 
-        created_at = rows[0].get("created_at")
+        def _created_at_key(rec):
+            raw = rec.get("created_at")
+            if not raw:
+                return datetime.min
+            try:
+                return _parse_iso_datetime(raw)
+            except Exception:
+                return datetime.min
+
+        rows_sorted = sorted(rows, key=_created_at_key, reverse=True)
+        created_at = rows_sorted[0].get("created_at")
         if not created_at:
             return {"is_new": True}
 
-        created_at_str = str(created_at).replace("Z", "+00:00")
-        last_dt = datetime.fromisoformat(created_at_str)
-        now_dt = datetime.now(last_dt.tzinfo) if last_dt.tzinfo else datetime.now()
-        days = (now_dt - last_dt).days
+        try:
+            last_dt = _parse_iso_datetime(created_at)
+        except Exception:
+            return {"is_new": True}
+
+        days = (datetime.utcnow() - last_dt).days
 
         if days <= 7:
             return {"is_frequent": True, "days_since": days}

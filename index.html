@@ -1442,6 +1442,44 @@ function next1b(){
   vData.status='pending';vData.industry=localStorage.getItem('selectedIndustry')||'manufacturing';
   vData.timestamp=Date.now();
   const vs=S.get('visitors')||[];vs.unshift(vData);S.set('visitors',vs);
+
+const BACKEND = 'http://127.0.0.1:8000';
+fetch('http://127.0.0.1:8000/api/register', {
+  method: 'POST',
+  headers: {'Content-Type': 'application/json'},
+  body: JSON.stringify({
+    name: vData.name,
+    email: vData.email,
+    phone: vData.phone,
+    company: vData.company,
+    department: vData.department,
+    visitor_type: vData.visitorType || '',
+    host_name: vData.host,
+    host_designation: vData.designation || '',
+    purpose: vData.purpose,
+    visit_date: vData.date,
+    time_slot: vData.timeSlot,
+    notes: vData.notes || '',
+    industry: vData.industry || ''
+  })
+})
+.then(r => {
+  console.log('Response status:', r.status);
+  return r.json();
+})
+.then(data => {
+  console.log('Backend response:', data);
+  if(data.success) {
+    vData.backendId = data.visit_id;
+    localStorage.setItem('lastVisitId', data.visit_id);
+    console.log('✅ Backend visit ID:', data.visit_id);
+  } else {
+    console.log('❌ Backend error:', data);
+  }
+})
+.catch(err => {
+  console.log('❌ Fetch failed:', err.message);
+});
   toast(`Visit ID: ${vData.id} created`,'ok');
   updateStepProg(2);showVPanel('vp-2');
   initBriefing();
@@ -1804,7 +1842,62 @@ function startQRScanner(){
   if(typeof Html5Qrcode==='undefined'){toast('QR scanner library not loaded','err');resetScanner();return;}
   qrScanner=new Html5Qrcode('qr-reader');
   qrScanner.start({facingMode:'environment'},{fps:10,qrbox:{width:200,height:200}},
-    (txt)=>{stopQRScanner();try{const d=JSON.parse(txt);const v=getVisitorByPassId(d.passId);v?handleScannedVisitor(v):toast('Unknown QR code','err');}catch{toast('Invalid QR format','err');}},()=>{}
+    (txt)=>{
+  stopQRScanner();
+  const BACKEND = 'http://127.0.0.1:8000';
+  toast('Verifying pass...', 'info', 2000);
+  fetch(BACKEND + '/api/guard/scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({qr_data: txt})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if(data.found) {
+      const v = {
+        id: data.visitor.name,
+        name: data.visitor.name,
+        company: data.visitor.company,
+        department: data.visitor.department,
+        host: data.visitor.host_name,
+        visitorType: data.visitor.visitor_type || 'Visitor',
+        phone: data.visitor.phone,
+        date: data.pass.visit_date,
+        timeSlot: data.pass.time_slot,
+        passId: data.pass.pass_id,
+        briefingComplete: data.briefing_complete,
+        faceMatch: data.face_match || 0,
+        otpVerified: data.otp_verified,
+        status: data.is_blacklisted ? 'flagged' : 
+                data.current_status || 'pending',
+        selfieDataUrl: null
+      };
+      handleScannedVisitor(v);
+      if(data.is_blacklisted) {
+        toast('⚠️ BLACKLISTED VISITOR DETECTED', 'err', 5000);
+      }
+    } else {
+      try {
+        const d = JSON.parse(txt);
+        const localV = getVisitorByPassId(d.passId);
+        localV ? handleScannedVisitor(localV) : 
+        toast('Pass not found in system','err');
+      } catch {
+        toast('Invalid QR code','err');
+      }
+    }
+  })
+  .catch(() => {
+    try {
+      const d = JSON.parse(txt);
+      const localV = getVisitorByPassId(d.passId);
+      localV ? handleScannedVisitor(localV) : 
+      toast('Unknown QR code','err');
+    } catch {
+      toast('Invalid QR format','err');
+    }
+  });
+},()=>{}
   ).catch(()=>{toast('Camera permission denied','err');resetScanner();});
 }
 
@@ -2009,6 +2102,18 @@ function updateLDStatus(ld){
 }
 
 function renderOverview(){
+const BACKEND = 'http://127.0.0.1:8000';
+fetch(BACKEND + '/api/admin/stats')
+.then(r => r.json())
+.then(stats => {
+  const t = document.getElementById('stat-today');
+  const i = document.getElementById('stat-inside');
+  const f = document.getElementById('stat-flagged');
+  if(t) t.textContent = stats.total_today;
+  if(i) i.textContent = stats.currently_inside;
+  if(f) f.textContent = stats.flagged_today;
+})
+.catch(err => console.log('Stats fetch failed:', err));
   const vs=S.get('visitors')||[];
   const today=new Date().toISOString().split('T')[0];
   const todayV=vs.filter(v=>v.date===today);
