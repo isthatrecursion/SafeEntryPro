@@ -3912,12 +3912,53 @@
       }, 1200);
     }
 
-    function genOTPAndShow() {
-      otpVal = genOTP(); otpExpiry = Date.now() + 5 * 60000;
-      S.set('curOTP', { value: otpVal, expiry: otpExpiry, used: false, visitId: vData.id });
-      document.getElementById('otp-disp').textContent = otpVal;
-      startOTPTimer();
-      setTimeout(() => { document.getElementById('resend-wrap').style.display = 'block'; }, 60000);
+    function genOTPAndShow(){
+      const phone = vData.phone;
+      const visitId = vData.backendId || vData.id;
+      
+      fetch('http://127.0.0.1:8000/api/otp/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          phone: phone,
+          visit_id: visitId
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        if(data.success) {
+          otpVal = data.otp;
+          otpExpiry = Date.now() + (data.expires_in_seconds * 1000);
+          S.set('curOTP', {
+            value: data.otp, 
+            expiry: otpExpiry, 
+            used: false, 
+            visitId: visitId
+          });
+          document.getElementById('otp-disp').textContent = data.otp;
+          startOTPTimer();
+          setTimeout(()=>{
+            document.getElementById('resend-wrap').style.display='block';
+          }, 60000);
+          toast('OTP sent successfully ✓', 'ok');
+          console.log('✅ OTP from backend:', data.otp);
+        } else {
+          toast('OTP send failed', 'err');
+        }
+      })
+      .catch(err => {
+        console.log('OTP fetch failed, using local:', err.message);
+        otpVal = genOTP();
+        otpExpiry = Date.now() + 5*60000;
+        S.set('curOTP', {
+          value: otpVal, 
+          expiry: otpExpiry, 
+          used: false, 
+          visitId: visitId
+        });
+        document.getElementById('otp-disp').textContent = otpVal;
+        startOTPTimer();
+      });
     }
 
     function startOTPTimer() {
