@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from database import db_insert, db_select, db_update
+from database import db_select, db_insert, db_update
 from datetime import datetime, timedelta
 import random
+import os
 
 router = APIRouter()
 
@@ -12,8 +13,14 @@ class OTPSend(BaseModel):
     visit_id: str
 
 
+class OTPVerify(BaseModel):
+    phone: str
+    otp: str
+    visit_id: str
+
+
 @router.post("/otp/send")
-def send_otp(payload: OTPSend):
+async def send_otp(data: OTPSend):
     try:
         otp = str(random.randint(100000, 999999))
         expires_at = datetime.utcnow() + timedelta(minutes=5)
@@ -21,74 +28,91 @@ def send_otp(payload: OTPSend):
         db_insert(
             "otp_store",
             {
-                "visit_id": payload.visit_id,
-                "phone": payload.phone,
+                "visit_id": data.visit_id,
+                "phone": data.phone,
                 "otp_value": otp,
                 "expires_at": expires_at.isoformat(),
                 "used": False,
             },
         )
 
-        return {
+        sms_sent = False
+        TWILIO_SID = os.getenv("TWILIO_SID")
+        TWILIO_TOKEN = os.getenv("TWILIO_TOKEN")
+        TWILIO_FROM = os.getenv("TWILIO_FROM")
+
+        if TWILIO_SID and TWILIO_TOKEN and TWILIO_FROM:
+            try:
+                from twilio.rest import Client
+
+                client = Client(TWILIO_SID, TWILIO_TOKEN)
+
+                phone_e164 = data.phone
+                if not phone_e164.startswith("+"):
+                    phone_e164 = "+91" + phone_e164.lstrip("0")
+
+                message = client.messages.create(
+                    body=f"Your SafeEntry Pro OTP is: {otp}. Valid for 5 minutes. Do not share with anyone.",
+                    from_=TWILIO_FROM,
+                    to=phone_e164,
+                )
+
+                if message.sid:
+                    sms_sent = True
+                    print(f"✅ SMS sent to {phone_e164}, SID: {message.sid}")
+
+            except Exception as sms_err:
+                print(f"❌ Twilio error: {sms_err}")
+
+        response = {
             "success": True,
-            "otp": otp,
-            "message": "OTP sent",
             "expires_in_seconds": 300,
+            "sms_sent": sms_sent,
+            "message": "OTP sent to your mobile" if sms_sent else "OTP generated",
         }
+
+        if not sms_sent:
+            response["otp"] = otp
+            print(f"⚠️ SMS not sent, OTP for demo: {otp}")
+
+        return response
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class OTPVerify(BaseModel):
-    phone: str
-    otp: str
-    visit_id: str
-
-
-def _parse_iso_datetime(value: str) -> datetime:
-    s = str(value).strip()
-    if s.endswith("Z"):
-        s = s[:-1] + "+00:00"
-    dt = datetime.fromisoformat(s)
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(tz=None).replace(tzinfo=None)
-    return dt
-
-
 @router.post("/otp/verify")
-def verify_otp(payload: OTPVerify):
+async def verify_otp(data: OTPVerify):
     try:
-        results = db_select(
+        result = db_select(
             "otp_store",
-            {"visit_id": f"eq.{payload.visit_id}", "phone": f"eq.{payload.phone}"},
+            {
+                "visit_id": f"eq.{data.visit_id}",
+                "phone": f"eq.{data.phone}",
+            },
         )
 
-        if not results:
-            raise HTTPException(status_code=404, detail="OTP not found")
+        if not result:
+            return {"success": False, "message": "OTP not found"}
 
-        record = results[-1]
+        record = result[-1]
 
-        if record.get("used") is True:
+        if record["used"]:
             return {"success": False, "message": "OTP already used"}
 
-        expires_at_raw = record.get("expires_at")
-        if not expires_at_raw:
+        expires_at = datetime.fromisoformat(
+            record["expires_at"].replace("Z", "+00:00")
+        ).replace(tzinfo=None)
+
+        if datetime.utcnow() > expires_at:
             return {"success": False, "message": "OTP expired"}
 
-        try:
-            expires_at = _parse_iso_datetime(expires_at_raw)
-        except Exception:
-            return {"success": False, "message": "OTP expired"}
-
-        if expires_at < datetime.utcnow():
-            return {"success": False, "message": "OTP expired"}
-
-        if str(record.get("otp_value")) != str(payload.otp):
+        if record["otp_value"] != data.otp:
             return {"success": False, "message": "Incorrect OTP"}
 
         db_update("otp_store", "id", record["id"], {"used": True})
+
         return {"success": True, "message": "OTP verified successfully"}
-    except HTTPException:
-        raise
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
