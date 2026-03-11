@@ -2860,16 +2860,24 @@
       <div class="g-tab-panel on" id="g-scan">
         <div class="g-stats">
           <div class="g-stat">
+            <div class="g-stat-label">Registered Today</div>
+            <div class="g-stat-val" id="g-registered">0</div>
+          </div>
+          <div class="g-stat">
             <div class="g-stat-label">On Premises Now</div>
             <div class="g-stat-val" id="g-onsite">0</div>
           </div>
           <div class="g-stat">
-            <div class="g-stat-label">Registered Today</div>
-            <div class="g-stat-val" id="g-registered">0</div>
+            <div class="g-stat-label">This Slot</div>
+            <div class="g-stat-val" id="g-slot-count">0</div>
           </div>
           <div class="g-stat alert-card">
-            <div class="g-stat-label">⚠️ Overstay Alerts</div>
+            <div class="g-stat-label">⚠️ Overstay</div>
             <div class="g-stat-val" id="g-overstay">0</div>
+          </div>
+          <div class="g-stat" style="border-color:rgba(220,50,50,.3)">
+            <div class="g-stat-label">Denied Today</div>
+            <div class="g-stat-val" id="g-denied" style="color:#FF3B3B">0</div>
           </div>
         </div>
         <!-- Today's Visitors -->
@@ -4899,8 +4907,16 @@ _SafeEntry Pro — Smart Visitor Management_`
     let qrScanner = null, scanOn = false, curVisitor = null;
 
     function initGuard() {
-      checkGuardLockdown(); updateGStats(); loadTodayVisitors(); populateDemoSel(); startOverstayCheck();
+      checkGuardLockdown();
+      updateGStats();
+      loadTodayVisitors();
+      populateDemoSel();
+      startOverstayCheck();
       setupDenyPinInputs();
+      setInterval(() => {
+        updateGStats();
+        loadTodayVisitors();
+      }, 30000);
       setInterval(renderTracking, 30000);
     }
 
@@ -4916,13 +4932,45 @@ _SafeEntry Pro — Smart Visitor Management_`
           const onsite = document.getElementById('g-onsite');
           const overstay = document.getElementById('g-overstay');
           const tabCnt = document.getElementById('g-tab-cnt');
+          const denied = document.getElementById('g-denied');
+          const reg = document.getElementById('g-registered');
           if (onsite) onsite.textContent = data.currently_inside || 0;
           if (overstay) overstay.textContent = data.overstay_count || 0;
           if (tabCnt) tabCnt.textContent = data.currently_inside || 0;
+          if (denied) denied.textContent = data.denied || 0;
+          if (reg) reg.textContent = data.total_today || 0;
+
+          // Current time slot count
+          const now = new Date();
+          const hr = now.getHours();
+          let currentSlot = '';
+          if (hr >= 8 && hr < 10) currentSlot = '08:00 - 10:00';
+          else if (hr >= 10 && hr < 12) currentSlot = '10:00 - 12:00';
+          else if (hr >= 12 && hr < 14) currentSlot = '12:00 - 14:00';
+          else if (hr >= 14 && hr < 16) currentSlot = '14:00 - 16:00';
+          else if (hr >= 16 && hr < 18) currentSlot = '16:00 - 18:00';
+          else currentSlot = 'Off Hours';
+
+          // Update slot label
+          const slotLabel = document.querySelector(
+            '#g-slot-count + .g-stat-label, #g-slot-count');
+          const slotCard = document.getElementById('g-slot-count');
+
+          // Fetch today visitors to count current slot
+          fetch('http://127.0.0.1:8000/api/visitor/today')
+            .then(r => r.json())
+            .then(td => {
+              const slotVisitors = (td.visitors || []).filter(v =>
+                v.time_slot === currentSlot);
+              if (slotCard) slotCard.textContent = slotVisitors.length;
+            }).catch(() => {
+              if (slotCard) slotCard.textContent = '—';
+            });
         })
         .catch(() => {
           const vs = S.get('visitors') || [];
-          const active = vs.filter(v => ['active', 'overstay'].includes(v.status));
+          const active = vs.filter(v =>
+            ['active', 'overstay'].includes(v.status));
           const os = vs.filter(v => v.status === 'overstay');
           const onsite = document.getElementById('g-onsite');
           const overstay = document.getElementById('g-overstay');
@@ -4936,79 +4984,198 @@ _SafeEntry Pro — Smart Visitor Management_`
     function loadTodayVisitors() {
       const el = document.getElementById('today-visitors-list');
       if (!el) return;
-      el.innerHTML = '<div style="text-align:center;padding:20px;color:#8B949E">Loading...</div>';
+      el.innerHTML = `<div style="text-align:center;
+        padding:20px;color:#8B949E">
+        ⏳ Loading from Supabase...
+      </div>`;
 
+      // Load stats first
       fetch('http://127.0.0.1:8000/api/admin/stats')
         .then(r => r.json())
         .then(stats => {
           const reg = document.getElementById('g-registered');
+          const onsite = document.getElementById('g-onsite');
+          const overstay = document.getElementById('g-overstay');
+          const denied = document.getElementById('g-denied');
           if (reg) reg.textContent = stats.total_today || 0;
+          if (onsite) onsite.textContent = stats.currently_inside || 0;
+          if (overstay) overstay.textContent = stats.overstay_count || 0;
+          if (denied) denied.textContent = stats.denied || 0;
         }).catch(() => { });
 
+      // Load real visitor list
       fetch('http://127.0.0.1:8000/api/visitor/today')
         .then(r => r.json())
         .then(data => {
           const visitors = data.visitors || [];
+
+          // Update slot count
+          const now = new Date();
+          const hr = now.getHours();
+          let currentSlot = '';
+          if (hr >= 8 && hr < 10) currentSlot = '08:00 - 10:00';
+          else if (hr >= 10 && hr < 12) currentSlot = '10:00 - 12:00';
+          else if (hr >= 12 && hr < 14) currentSlot = '12:00 - 14:00';
+          else if (hr >= 14 && hr < 16) currentSlot = '14:00 - 16:00';
+          else if (hr >= 16 && hr < 18) currentSlot = '16:00 - 18:00';
+          const slotCount = visitors.filter(v =>
+            v.time_slot === currentSlot).length;
+          const slotEl = document.getElementById('g-slot-count');
+          if (slotEl) slotEl.textContent = slotCount;
+
           if (!visitors.length) {
-            el.innerHTML = '<div style="text-align:center;padding:24px;color:#8B949E">No visitors registered today</div>';
+            el.innerHTML = `<div style="text-align:center;
+            padding:36px;color:#8B949E">
+            <div style="font-size:1.5rem;margin-bottom:8px">
+              📋
+            </div>
+            <div style="font-weight:600">
+              No visitors registered today
+            </div>
+          </div>`;
             return;
           }
+
           const statusColor = {
-            pending: '#FF6B2B', verified: '#00D4AA', active: '#00D4AA',
-            completed: '#8B949E', flagged: '#FF6B2B', denied: '#FF3B3B', overstay: '#FF3B3B'
+            pending: '#FF6B2B', verified: '#00D4AA',
+            active: '#00D4AA', completed: '#8B949E',
+            flagged: '#FF6B2B', denied: '#FF3B3B',
+            overstay: '#FF3B3B'
           };
           const statusIcon = {
             pending: '⏳', verified: '✅', active: '🟢',
-            completed: '✔️', flagged: '⚠️', denied: '❌', overstay: '🔴'
+            completed: '✔️', flagged: '⚠️',
+            denied: '❌', overstay: '🔴'
           };
+          const statusLabel = {
+            pending: 'Pending', verified: 'Verified',
+            active: 'Inside', completed: 'Completed',
+            flagged: 'Flagged', denied: 'Denied',
+            overstay: 'Overstay'
+          };
+
           el.innerHTML = visitors.map(v => `
-          <div style="background:#161B22;border:1px solid #30363D;
-            border-left:3px solid ${statusColor[v.status] || '#30363D'};
-            border-radius:10px;padding:13px 16px;margin-bottom:10px;
-            display:flex;align-items:center;gap:12px;cursor:pointer"
-            onclick="guardLookupVisitor('${v.id}')">
-            <div style="font-size:1.3rem">${statusIcon[v.status] || '👤'}</div>
-            <div style="flex:1">
-              <div style="font-weight:700;font-size:.88rem">${v.name}</div>
-              <div style="font-size:.72rem;color:#8B949E;margin-top:2px">
-                ${v.department || ''} · ${v.company || ''}
+        <div style="background:#161B22;
+          border:1px solid #30363D;
+          border-left:3px solid 
+            ${statusColor[v.status] || '#30363D'};
+          border-radius:10px;padding:14px 16px;
+          margin-bottom:10px;cursor:pointer;
+          transition:border-color .2s"
+          onclick="guardLookupVisitor('${v.id}')">
+
+          <div style="display:flex;align-items:center;
+            justify-content:space-between;
+            margin-bottom:8px">
+            <div style="display:flex;align-items:center;
+              gap:10px">
+              <div style="font-size:1.2rem">
+                ${statusIcon[v.status] || '👤'}
               </div>
-              <div style="font-size:.7rem;color:#8B949E;margin-top:1px">
-                Host: ${v.host_name || '—'} · Slot: ${v.time_slot || '—'}
+              <div>
+                <div style="font-weight:700;
+                  font-size:.9rem;color:#E6EDF3">
+                  ${v.name}
+                </div>
+                <div style="font-size:.72rem;
+                  color:#8B949E;margin-top:2px">
+                  ${v.company || '—'} · ${v.department || '—'}
+                </div>
               </div>
             </div>
             <div style="text-align:right">
               <div style="font-size:.72rem;font-weight:700;
                 color:${statusColor[v.status] || '#8B949E'};
-                text-transform:uppercase;letter-spacing:.05em">
-                ${v.status || 'pending'}
+                text-transform:uppercase;
+                letter-spacing:.05em;
+                background:${statusColor[v.status] || '#8B949E'}22;
+                padding:2px 8px;border-radius:99px">
+                ${statusLabel[v.status] || v.status}
               </div>
-              <div style="font-size:.68rem;color:#8B949E;
-                margin-top:3px;font-family:var(--font-m)">${v.id}</div>
             </div>
-          </div>`).join('');
+          </div>
+
+          <div style="display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:6px;margin-top:8px">
+            <div style="background:#0D1117;
+              border-radius:6px;padding:6px 8px">
+              <div style="font-size:.6rem;color:#8B949E;
+                text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:2px">
+                Host
+              </div>
+              <div style="font-size:.75rem;
+                font-weight:600;color:#E6EDF3">
+                ${v.host_name || '—'}
+              </div>
+            </div>
+            <div style="background:#0D1117;
+              border-radius:6px;padding:6px 8px">
+              <div style="font-size:.6rem;color:#8B949E;
+                text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:2px">
+                Time Slot
+              </div>
+              <div style="font-size:.75rem;
+                font-weight:600;color:#E6EDF3;
+                font-family:var(--font-m)">
+                ${v.time_slot || '—'}
+              </div>
+            </div>
+            <div style="background:#0D1117;
+              border-radius:6px;padding:6px 8px">
+              <div style="font-size:.6rem;color:#8B949E;
+                text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:2px">
+                Purpose
+              </div>
+              <div style="font-size:.75rem;
+                font-weight:600;color:#E6EDF3">
+                ${v.purpose || '—'}
+              </div>
+            </div>
+            <div style="background:#0D1117;
+              border-radius:6px;padding:6px 8px">
+              <div style="font-size:.6rem;color:#8B949E;
+                text-transform:uppercase;
+                letter-spacing:.06em;margin-bottom:2px">
+                Phone
+              </div>
+              <div style="font-size:.75rem;
+                font-weight:600;color:#E6EDF3;
+                font-family:var(--font-m)">
+                ${(v.phone || '—').replace(
+            /(\d{2})\d{6}(\d{2})/, '$1xxxxxx$2')}
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:8px;
+            font-size:.65rem;color:#8B949E;
+            font-family:var(--font-m)">
+            ID: ${v.id}
+          </div>
+        </div>`).join('');
         })
-        .catch(() => {
-          const vs = (S.get('visitors') || []).filter(v => {
-            const today = new Date().toISOString().split('T')[0];
-            return v.date === today;
-          });
-          if (!vs.length) {
-            el.innerHTML = '<div style="text-align:center;padding:24px;color:#8B949E">No visitors today</div>';
-            return;
-          }
-          el.innerHTML = vs.map(v => `
-          <div style="background:#161B22;border:1px solid #30363D;
-            border-radius:10px;padding:13px 16px;margin-bottom:10px;
-            display:flex;align-items:center;gap:12px">
-            <div style="flex:1">
-              <div style="font-weight:700;font-size:.88rem">${v.name}</div>
-              <div style="font-size:.72rem;color:#8B949E">${v.department} · ${v.company}</div>
-            </div>
-            <div style="font-size:.72rem;font-weight:700;color:#8B949E;text-transform:uppercase">
-              ${v.status}
-            </div>
-          </div>`).join('');
+        .catch(err => {
+          console.log('loadTodayVisitors error:', err);
+          el.innerHTML = `<div style="text-align:center;
+          padding:36px;color:#8B949E">
+          <div style="font-size:1.5rem;margin-bottom:8px">
+            ⚠️
+          </div>
+          <div style="font-weight:600;margin-bottom:4px">
+            Could not load visitor data
+          </div>
+          <div style="font-size:.78rem;margin-bottom:12px">
+            Make sure backend is running
+          </div>
+          <button class="btn btn-ghost-d btn-sm"
+            onclick="loadTodayVisitors()">
+            🔄 Retry
+          </button>
+        </div>`;
         });
     }
 
@@ -5547,10 +5714,7 @@ _SafeEntry Pro — Smart Visitor Management_`
     // ADMIN PORTAL
     // ══════════════════════════════════════════════════════════════════════
     function initAdmin() {
-      checkAdminLockdown();
-      renderOverview(); renderVisitors(); renderSafetyEditor(); renderZones();
-      loadSettings(); renderFeedback();
-      setInterval(() => { const e = document.getElementById('admin-time'); if (e) e.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }); }, 1000);
+      renderOverview();
     }
 
     function showAPanel(name, el) {
@@ -5560,7 +5724,9 @@ _SafeEntry Pro — Smart Visitor Management_`
       if (el) el.classList.add('on');
       const titles = { overview: 'Overview', visitors: 'Visitors', safety: 'Safety Content', access: 'Access Control', analytics: 'Analytics', feedback: 'Feedback', settings: 'Settings' };
       const tt = document.getElementById('a-topbar-title'); if (tt) tt.textContent = titles[name] || name;
-      if (name === 'analytics') setTimeout(renderCharts, 100);
+      if (name === 'analytics') { renderAnalytics(); setTimeout(renderCharts, 100); }
+      if (name === 'overview') renderOverview();
+      if (name === 'visitors') renderVisitors();
       if (name === 'feedback') renderFeedback();
       if (name === 'settings') loadSettings();
       document.getElementById('sidebar').classList.remove('open');
@@ -5579,25 +5745,89 @@ _SafeEntry Pro — Smart Visitor Management_`
       else { el.innerHTML = `<div style="background:rgba(45,138,78,.1);border:1px solid rgba(45,138,78,.2);border-radius:var(--r-md);padding:11px 15px;font-size:.83rem;color:#2D8A4E">✓ Normal operations</div>`; }
     }
 
-    function renderOverview() {
-      const vs = S.get('visitors') || [];
-      const today = new Date().toISOString().split('T')[0];
-      const todayV = vs.filter(v => v.date === today);
-      const onsite = vs.filter(v => ['active', 'overstay'].includes(v.status));
-      const pending = vs.filter(v => v.status === 'pending');
-      const flagged = vs.filter(v => ['flagged', 'denied'].includes(v.status) && v.date === today);
-      const briefed = vs.filter(v => v.briefingComplete);
-      const total = vs.length || 1;
-      const metrics = [
-        { label: "Today's Visitors", value: todayV.length, icon: '👤', delta: `+${Math.max(0, todayV.length - 3)} vs avg`, dir: 'up' },
-        { label: 'On Premises', value: onsite.length, icon: '🏭', delta: `${onsite.filter(v => v.status === 'overstay').length} overstay`, dir: onsite.some(v => v.status === 'overstay') ? 'dn' : '' },
-        { label: 'Pending Check-in', value: pending.length, icon: '⏳', delta: 'Awaiting gate', dir: '' },
-        { label: 'Flagged Today', value: flagged.length, icon: '⚠️', delta: flagged.length > 0 ? '⚠️ Review needed' : '✓ All clear', dir: flagged.length > 0 ? 'dn' : 'up' },
-        { label: 'Briefing Rate', value: `${Math.round(briefed.length / total * 100)}%`, icon: '📋', delta: `${briefed.length} of ${vs.length}`, dir: 'up' }
-      ];
+    async function renderOverview() {
       const mg = document.getElementById('a-metrics');
-      if (mg) mg.innerHTML = metrics.map(m => `<div class="metric-card"><div class="m-icon">${m.icon}</div><div class="m-label">${m.label}</div><div class="m-val">${m.value}</div><div class="m-delta ${m.dir}">${m.delta}</div></div>`).join('');
-      renderAnomalies(); renderActivityFeed(); renderQuickStats(vs, today);
+      if (mg) mg.innerHTML = `<div style="text-align:center;
+        padding:20px;color:var(--dark-subtext)">
+        Loading from Supabase...
+      </div>`;
+
+      try {
+        const [statsRes, todayRes] = await Promise.all([
+          fetch('http://127.0.0.1:8000/api/admin/stats'),
+          fetch('http://127.0.0.1:8000/api/visitor/today')
+        ]);
+        const stats = await statsRes.json();
+        const todayData = await todayRes.json();
+        const visitors = todayData.visitors || [];
+
+        const briefed = visitors.filter(v =>
+          v.briefing_complete).length;
+        const total = visitors.length || 1;
+        const briefingRate = Math.round(briefed / total * 100);
+
+        const metrics = [
+          {
+            label: "Today's Visitors",
+            value: stats.total_today || 0,
+            icon: '👤',
+            delta: `${stats.total_today || 0} registered`,
+            dir: 'up'
+          },
+          {
+            label: 'On Premises',
+            value: stats.currently_inside || 0,
+            icon: '🏭',
+            delta: `${stats.overstay_count || 0} overstay`,
+            dir: stats.overstay_count > 0 ? 'dn' : ''
+          },
+          {
+            label: 'Flagged Today',
+            value: stats.flagged || 0,
+            icon: '⚠️',
+            delta: stats.flagged > 0 ?
+              '⚠️ Review needed' : '✓ All clear',
+            dir: stats.flagged > 0 ? 'dn' : 'up'
+          },
+          {
+            label: 'Denied Today',
+            value: stats.denied || 0,
+            icon: '❌',
+            delta: stats.denied > 0 ?
+              'Access blocked' : '✓ None denied',
+            dir: stats.denied > 0 ? 'dn' : 'up'
+          },
+          {
+            label: 'Briefing Rate',
+            value: briefingRate + '%',
+            icon: '📋',
+            delta: `${briefed} of ${visitors.length}`,
+            dir: 'up'
+          }
+        ];
+
+        if (mg) mg.innerHTML = metrics.map(m => `
+          <div class="metric-card">
+            <div class="m-icon">${m.icon}</div>
+            <div class="m-label">${m.label}</div>
+            <div class="m-val">${m.value}</div>
+            <div class="m-delta ${m.dir}">${m.delta}</div>
+          </div>`).join('');
+
+        // Activity feed with real visitors
+        renderActivityFeed(visitors);
+        renderQuickStats(visitors);
+
+      } catch (e) {
+        console.log('renderOverview error:', e);
+        if (mg) mg.innerHTML = `<div style="text-align:center;
+          padding:20px;color:var(--dark-subtext)">
+          ⚠️ Could not load — is backend running?
+          <br><button class="btn btn-ghost-d btn-sm"
+            onclick="renderOverview()"
+            style="margin-top:8px">Retry</button>
+        </div>`;
+      }
     }
 
     function renderAnomalies() {
@@ -5607,36 +5837,231 @@ _SafeEntry Pro — Smart Visitor Management_`
       list.innerHTML = flags.length ? flags.map(f => `<div class="anom-card"><div style="font-size:1rem;flex-shrink:0">${f.severity === 'high' ? '🚨' : '⚠️'}</div><div style="flex:1;line-height:1.5">${f.message}</div><div style="font-family:var(--font-m);font-size:.68rem;color:var(--dark-subtext);flex-shrink:0">${timeAgo(f.timestamp)}</div></div>`).join('') : '<div style="color:var(--dark-subtext);font-size:.83rem;padding:8px 0">✓ No active anomalies</div>';
     }
 
-    function renderActivityFeed() {
-      const vs = [...S.get('visitors') || []].sort((a, b) => (b.checkinTime || b.timestamp || 0) - (a.checkinTime || a.timestamp || 0)).slice(0, 10);
-      const colors = { active: '#2D8A4E', completed: '#8A8580', flagged: '#D4A017', denied: '#DC3232', overstay: '#DC3232', pending: 'var(--accent)' };
-      const actions = { active: 'checked in', completed: 'checked out', flagged: 'flagged at gate', denied: 'denied entry', overstay: '⚠️ overstay', pending: 'registered' };
-      const el = document.getElementById('a-activity'); if (!el) return;
-      el.innerHTML = vs.map(v => `<div class="act-item"><div class="act-dot" style="background:${colors[v.status] || 'var(--accent)'}"></div><div class="act-txt"><strong>${v.name}</strong> ${actions[v.status] || ''} — ${v.department}</div><div class="act-time">${timeAgo(v.checkinTime || v.timestamp || Date.now())}</div></div>`).join('');
+    function renderActivityFeed(visitors) {
+      const el = document.getElementById('a-activity');
+      if (!el) return;
+
+      if (!visitors || !visitors.length) {
+        el.innerHTML = `<div style="text-align:center;
+          padding:24px;color:var(--dark-subtext);
+          font-size:.82rem">
+          No activity today yet
+        </div>`;
+        return;
+      }
+
+      const statusIcon = {
+        pending: '⏳', verified: '✅', active: '🟢',
+        completed: '✔️', flagged: '⚠️',
+        denied: '❌', overstay: '🔴',
+        pass_issued: '🎫', checked_out: '🚪'
+      };
+      const statusColor = {
+        pending: '#FF6B2B', verified: '#00D4AA',
+        active: '#00D4AA', completed: '#8B949E',
+        flagged: '#FF6B2B', denied: '#FF3B3B',
+        overstay: '#FF3B3B', pass_issued: '#00D4AA',
+        checked_out: '#8B949E'
+      };
+
+      // Sort by created_at descending
+      const sorted = [...visitors].sort((a, b) => {
+        return new Date(b.created_at || 0) -
+          new Date(a.created_at || 0);
+      });
+
+      el.innerHTML = sorted.slice(0, 10).map(v => {
+        const time = v.created_at ?
+          new Date(v.created_at).toLocaleTimeString(
+            'en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          }) : '—';
+
+        return `
+        <div style="display:flex;align-items:flex-start;
+          gap:10px;padding:10px 0;
+          border-bottom:1px solid rgba(255,255,255,.05)">
+          <div style="font-size:1.1rem;flex-shrink:0;
+            margin-top:2px">
+            ${statusIcon[v.status] || '👤'}
+          </div>
+          <div style="flex:1">
+            <div style="font-size:.82rem;font-weight:600;
+              color:var(--dark-text)">
+              ${v.name}
+              <span style="font-weight:400;
+                color:var(--dark-subtext)">
+                registered
+              </span>
+            </div>
+            <div style="font-size:.72rem;
+              color:var(--dark-subtext);margin-top:2px">
+              ${v.department || '—'} · 
+              ${v.company || '—'} · 
+              Slot: ${v.time_slot || '—'}
+            </div>
+            <div style="font-size:.7rem;margin-top:3px">
+              <span style="color:${statusColor[v.status] || '#8B949E'};
+                font-weight:700;text-transform:uppercase;
+                font-size:.65rem">
+                ${v.status || 'pending'}
+              </span>
+              · Purpose: ${v.purpose || '—'}
+            </div>
+          </div>
+          <div style="font-size:.68rem;
+            color:var(--dark-subtext);
+            font-family:var(--font-m);
+            flex-shrink:0;margin-top:2px">
+            ${time}
+          </div>
+        </div>`;
+      }).join('');
     }
 
-    function renderQuickStats(vs, today) {
-      const el = document.getElementById('a-quick-stats'); if (!el) return;
-      const todayV = vs.filter(v => v.date === today);
-      const depts = {}; todayV.forEach(v => { depts[v.department] = (depts[v.department] || 0) + 1; });
-      const top = Object.entries(depts).sort((a, b) => b[1] - a[1]).slice(0, 4);
-      if (!top.length) { el.innerHTML = '<div style="color:var(--dark-subtext);font-size:.83rem">No visitors today</div>'; return; }
-      el.innerHTML = top.map(([d, n]) => `<div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;font-size:.82rem"><div style="flex:1;color:var(--dark-subtext)">${d}</div><div style="width:60px;height:5px;background:var(--dark-surface3);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--accent);width:${Math.min(100, n / Math.max(1, todayV.length) * 100)}%"></div></div><div style="font-family:var(--font-m);font-size:.72rem;width:16px;text-align:right">${n}</div></div>`).join('') + `<div style="padding-top:11px;border-top:1px solid var(--dark-border);display:flex;justify-content:space-between;font-size:.78rem;color:var(--dark-subtext);margin-top:5px"><span>Total all time</span><span style="font-family:var(--font-m);font-weight:600;color:var(--dark-text)">${vs.length}</span></div>`;
+    function renderQuickStats(visitors) {
+      if (!visitors) visitors =
+        window._adminVisitors || [];
+
+      const el = document.getElementById('a-quick-stats');
+      if (!el) return;
+
+      const total = visitors.length;
+      const active = visitors.filter(v =>
+        ['active', 'pass_issued'].includes(v.status)).length;
+      const completed = visitors.filter(v =>
+        v.status === 'completed').length;
+      const flagged = visitors.filter(v =>
+        ['flagged', 'denied'].includes(v.status)).length;
+      const pending = visitors.filter(v =>
+        v.status === 'pending').length;
+
+      // Dept breakdown
+      const depts = {};
+      visitors.forEach(v => {
+        if (v.department)
+          depts[v.department] = (depts[v.department] || 0) + 1;
+      });
+      const topDept = Object.entries(depts)
+        .sort((a, b) => b[1] - a[1])[0];
+
+      el.innerHTML = `
+        <div style="display:grid;
+          grid-template-columns:1fr 1fr;
+          gap:10px">
+          <div style="background:#161B22;
+            border:1px solid #30363D;
+            border-radius:10px;padding:12px">
+            <div style="font-size:.68rem;color:#8B949E;
+              text-transform:uppercase;
+              letter-spacing:.06em;margin-bottom:4px">
+              Total Registered
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;
+              color:#E6EDF3">${total}</div>
+          </div>
+          <div style="background:#161B22;
+            border:1px solid #30363D;
+            border-radius:10px;padding:12px">
+            <div style="font-size:.68rem;color:#8B949E;
+              text-transform:uppercase;
+              letter-spacing:.06em;margin-bottom:4px">
+              Active / Inside
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;
+              color:#00D4AA">${active}</div>
+          </div>
+          <div style="background:#161B22;
+            border:1px solid #30363D;
+            border-radius:10px;padding:12px">
+            <div style="font-size:.68rem;color:#8B949E;
+              text-transform:uppercase;
+              letter-spacing:.06em;margin-bottom:4px">
+              Completed
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;
+              color:#8B949E">${completed}</div>
+          </div>
+          <div style="background:#161B22;
+            border:1px solid rgba(220,50,50,.3);
+            border-radius:10px;padding:12px">
+            <div style="font-size:.68rem;color:#8B949E;
+              text-transform:uppercase;
+              letter-spacing:.06em;margin-bottom:4px">
+              Flagged/Denied
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;
+              color:#FF3B3B">${flagged}</div>
+          </div>
+        </div>
+        ${topDept ? `
+        <div style="margin-top:10px;background:#161B22;
+          border:1px solid #30363D;border-radius:10px;
+          padding:12px">
+          <div style="font-size:.68rem;color:#8B949E;
+            text-transform:uppercase;
+            letter-spacing:.06em;margin-bottom:4px">
+            Top Department Today
+          </div>
+          <div style="font-size:.95rem;font-weight:700;
+            color:#FF6B2B">
+            ${topDept[0]}
+            <span style="font-size:.78rem;
+              font-weight:400;color:#8B949E">
+              (${topDept[1]} visitors)
+            </span>
+          </div>
+        </div>` : ''}`;
     }
 
-    function renderVisitors() {
-      const vs = S.get('visitors') || [];
-      const depts = [...new Set(vs.map(v => v.department).filter(Boolean))];
+    async function renderVisitors() {
+      const tb = document.getElementById('v-tbody');
       const sel = document.getElementById('v-filt-dept');
-      if (sel) sel.innerHTML = '<option value="">All Departments</option>' + depts.map(d => `<option>${d}</option>`).join('');
-      filterVisitors(); renderBL();
+      if (tb) tb.innerHTML = `<tr><td colspan="7" 
+        style="text-align:center;padding:24px;
+        color:var(--dark-subtext)">
+        ⏳ Loading from Supabase...
+      </td></tr>`;
+
+      try {
+        const r = await fetch(
+          'http://127.0.0.1:8000/api/visitor/today');
+        const data = await r.json();
+        const visitors = data.visitors || [];
+
+        // Populate department filter with real depts
+        const depts = [...new Set(
+          visitors.map(v => v.department).filter(Boolean))];
+        if (sel) sel.innerHTML =
+          '<option value="">All Departments</option>' +
+          depts.map(d =>
+            `<option value="${d}">${d}</option>`).join('');
+
+        // Store in window for filtering
+        window._adminVisitors = visitors;
+        filterVisitors();
+        renderBL();
+
+      } catch (e) {
+        console.log('renderVisitors error:', e);
+        if (tb) tb.innerHTML = `<tr><td colspan="7"
+          style="text-align:center;padding:24px;
+          color:var(--dark-subtext)">
+          ⚠️ Could not load visitors — backend offline
+          <br><button class="btn btn-ghost-d btn-sm"
+            onclick="renderVisitors()"
+            style="margin-top:8px">🔄 Retry</button>
+        </td></tr>`;
+      }
     }
 
     function filterVisitors() {
       const q = (document.getElementById('v-search')?.value || '').toLowerCase();
       const status = document.getElementById('v-filt-status')?.value || '';
       const dept = document.getElementById('v-filt-dept')?.value || '';
-      let vs = S.get('visitors') || [];
+      let vs = window._adminVisitors || S.get('visitors') || [];
       if (q) vs = vs.filter(v => `${v.name}${v.phone}${v.company}`.toLowerCase().includes(q));
       if (status) vs = vs.filter(v => v.status === status);
       if (dept) vs = vs.filter(v => v.department === dept);
@@ -5889,26 +6314,184 @@ _SafeEntry Pro — Smart Visitor Management_`
     }
 
     // Analytics
-    function renderAnalytics() {
-      const vs = S.get('visitors') || [];
-      // Flagged table
-      const tb = document.getElementById('flagged-tbody');
-      if (tb) {
-        const fl = vs.filter(v => ['flagged', 'denied'].includes(v.status));
-        tb.innerHTML = fl.length ? fl.map(v => `<tr><td style="font-weight:600">${v.name}</td><td><span class="badge b-acc" style="font-size:.62rem">${v.visitorType || '—'}</span></td><td>${v.department || '—'}</td><td><span class="badge ${v.status === 'flagged' ? 'b-warn' : 'b-err'}" style="font-size:.62rem">${v.status}</span></td><td style="font-size:.78rem">${v.flagReason || '—'}</td><td style="font-family:var(--font-m);font-size:.72rem">${v.date || '—'}</td></tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:22px;color:var(--dark-subtext)">No flagged/denied entries</td></tr>';
-      }
-      // Completion stats
-      const ce = document.getElementById('compl-stats');
-      if (ce) {
-        const total = vs.length || 1, done = vs.filter(v => v.briefingComplete).length, pct = Math.round(done / total * 100);
-        const depts = {}; vs.forEach(v => { if (!depts[v.department]) depts[v.department] = { t: 0, d: 0 }; depts[v.department].t++; if (v.briefingComplete) depts[v.department].d++; });
-        ce.innerHTML = `<div style="text-align:center;margin-bottom:16px"><div style="font-family:var(--font-d);font-size:2.8rem;font-weight:800;color:var(--accent)">${pct}%</div><div style="color:var(--dark-subtext);font-size:.78rem">${done} of ${vs.length} briefed</div></div>` + Object.entries(depts).slice(0, 5).map(([d, s]) => { const dp = Math.round(s.d / s.t * 100); return `<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:3px"><span style="color:var(--dark-subtext)">${d}</span><span style="font-family:var(--font-m)">${dp}%</span></div><div class="pb-track"><div class="pb-fill" style="width:${dp}%"></div></div></div>`; }).join('');
-      }
-      // Status dist
-      const se = document.getElementById('status-dist');
-      if (se) {
-        const counts = {}; vs.forEach(v => { counts[v.status] = (counts[v.status] || 0) + 1; }); const total = vs.length || 1; const cols = { active: '#2D8A4E', completed: '#8A8580', pending: 'var(--accent)', flagged: '#D4A017', denied: '#DC3232', overstay: '#DC3232' };
-        se.innerHTML = Object.entries(counts).map(([s, n]) => `<div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><div style="width:9px;height:9px;border-radius:50%;background:${cols[s] || 'var(--dark-subtext)'};flex-shrink:0"></div><div style="flex:1;font-size:.8rem;text-transform:capitalize">${s}</div><div style="height:5px;width:70px;background:var(--dark-surface3);border-radius:3px;overflow:hidden"><div style="height:100%;background:${cols[s] || 'var(--dark-subtext)'};width:${Math.round(n / total * 100)}%"></div></div><div style="font-family:var(--font-m);font-size:.72rem;width:20px;text-align:right">${n}</div></div>`).join('') || '<div style="color:var(--dark-subtext)">No data</div>';
+    async function renderAnalytics() {
+      try {
+        const [statsRes, todayRes, weeklyRes, deptRes] =
+          await Promise.all([
+            fetch('http://127.0.0.1:8000/api/admin/stats'),
+            fetch('http://127.0.0.1:8000/api/visitor/today'),
+            fetch('http://127.0.0.1:8000/api/admin/chart-weekly'),
+            fetch('http://127.0.0.1:8000/api/admin/chart-departments')
+          ]);
+
+        const stats = await statsRes.json();
+        const todayData = await todayRes.json();
+        const weekly = await weeklyRes.json();
+        const deptData = await deptRes.json();
+        const visitors = todayData.visitors || [];
+
+        // Flagged/Denied table
+        const tb = document.getElementById('flagged-tbody');
+        if (tb) {
+          const flagged = visitors.filter(v =>
+            ['flagged', 'denied'].includes(v.status));
+          tb.innerHTML = flagged.length ?
+            flagged.map(v => `
+            <tr>
+              <td style="font-weight:600">${v.name}</td>
+              <td>${v.company || '—'}</td>
+              <td>${v.department || '—'}</td>
+              <td>
+                <span style="color:${v.status === 'denied' ? '#FF3B3B' : '#FF6B2B'
+              };font-weight:700;text-transform:uppercase;
+                font-size:.75rem">
+                  ${v.status}
+                </span>
+              </td>
+              <td style="font-family:var(--font-m);
+                font-size:.78rem">${v.phone || '—'}</td>
+              <td style="font-size:.78rem">
+                ${v.purpose || '—'}
+              </td>
+            </tr>`).join('')
+            : `<tr><td colspan="6" 
+              style="text-align:center;padding:22px;
+              color:var(--dark-subtext)">
+              ✅ No flagged or denied entries today
+            </td></tr>`;
+        }
+
+        // Completion stats
+        const ce = document.getElementById('compl-stats');
+        if (ce) {
+          const total = visitors.length || 1;
+          const briefed = visitors.filter(v =>
+            v.briefing_complete).length;
+          const otpVerified = visitors.filter(v =>
+            v.otp_verified).length;
+          const faceVerified = visitors.filter(v =>
+            (v.face_match || 0) >= 75).length;
+          const passed = visitors.filter(v =>
+            ['active', 'completed', 'pass_issued']
+              .includes(v.status)).length;
+
+          const stats2 = [
+            {
+              label: 'Briefing Completed',
+              val: briefed, color: '#00D4AA'
+            },
+            {
+              label: 'OTP Verified',
+              val: otpVerified, color: '#FF6B2B'
+            },
+            {
+              label: 'Face Verified (≥75%)',
+              val: faceVerified, color: '#7C3AED'
+            },
+            {
+              label: 'Pass Issued',
+              val: passed, color: '#00A896'
+            },
+          ];
+
+          ce.innerHTML = stats2.map(s => `
+            <div style="margin-bottom:14px">
+              <div style="display:flex;
+                justify-content:space-between;
+                margin-bottom:5px">
+                <span style="font-size:.82rem;
+                  color:var(--dark-subtext)">
+                  ${s.label}
+                </span>
+                <span style="font-size:.82rem;
+                  font-weight:700;color:${s.color}">
+                  ${s.val}/${total}
+                </span>
+              </div>
+              <div style="background:rgba(255,255,255,.08);
+                border-radius:99px;height:6px;
+                overflow:hidden">
+                <div style="height:100%;
+                  width:${Math.round(s.val / (total || 1) * 100)}%;
+                  background:${s.color};
+                  border-radius:99px;
+                  transition:width .8s ease"></div>
+              </div>
+            </div>`).join('');
+        }
+
+        // Status distribution
+        const se = document.getElementById('status-dist');
+        if (se) {
+          const statusGroups = {
+            'Active': visitors.filter(v =>
+              v.status === 'active').length,
+            'Pass Issued': visitors.filter(v =>
+              v.status === 'pass_issued').length,
+            'Completed': visitors.filter(v =>
+              v.status === 'completed').length,
+            'Pending': visitors.filter(v =>
+              v.status === 'pending').length,
+            'Flagged': visitors.filter(v =>
+              v.status === 'flagged').length,
+            'Denied': visitors.filter(v =>
+              v.status === 'denied').length,
+          };
+          const colors = {
+            'Active': '#00D4AA',
+            'Pass Issued': '#FF6B2B',
+            'Completed': '#8B949E',
+            'Pending': '#E6EDF3',
+            'Flagged': '#FF6B2B',
+            'Denied': '#FF3B3B'
+          };
+          const maxVal = Math.max(
+            ...Object.values(statusGroups), 1);
+          se.innerHTML = Object.entries(statusGroups)
+            .map(([label, val]) => `
+            <div style="display:flex;align-items:center;
+              gap:10px;margin-bottom:10px">
+              <div style="width:80px;font-size:.75rem;
+                color:var(--dark-subtext);
+                text-align:right;flex-shrink:0">
+                ${label}
+              </div>
+              <div style="flex:1;background:rgba(255,255,255,.06);
+                border-radius:99px;height:18px;
+                overflow:hidden">
+                <div style="height:100%;
+                  width:${Math.round(val / maxVal * 100)}%;
+                  background:${colors[label] || '#8B949E'};
+                  border-radius:99px;
+                  display:flex;align-items:center;
+                  padding-left:8px;
+                  font-size:.68rem;font-weight:700;
+                  color:white;
+                  transition:width .8s ease;
+                  min-width:${val > 0 ? '28px' : '0'}">
+                  ${val > 0 ? val : ''}
+                </div>
+              </div>
+              <div style="width:24px;font-size:.78rem;
+                font-weight:700;
+                color:${colors[label] || '#8B949E'}">
+                ${val}
+              </div>
+            </div>`).join('');
+        }
+
+        // Render charts with real data
+        if (weekly.labels && weekly.counts) {
+          drawVolumeChart(weekly.labels, weekly.counts);
+        }
+        if (deptData.departments) {
+          drawDeptChart(deptData.departments);
+        }
+
+      } catch (e) {
+        console.log('renderAnalytics error:', e);
+        toast('Analytics load failed — is backend running?',
+          'err', 3000);
       }
     }
 
