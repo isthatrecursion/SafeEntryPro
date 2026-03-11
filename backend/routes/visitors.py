@@ -26,6 +26,36 @@ class VisitorRegister(BaseModel):
 @router.post("/register")
 def register_visitor(payload: VisitorRegister):
     try:
+        # --- Check 1: Exact duplicate (same phone + visit_date + time_slot) ---
+        exact_matches = db_select(
+            "visitors",
+            {
+                "phone": f"eq.{payload.phone}",
+                "visit_date": f"eq.{payload.visit_date}",
+                "time_slot": f"eq.{payload.time_slot}",
+            },
+        ) or []
+
+        if exact_matches:
+            return {
+                "success": False,
+                "duplicate": True,
+                "message": "You are already registered for this date and time slot.",
+                "existing_id": exact_matches[0]["id"],
+            }
+
+        # --- Check 2: Same-day visit (same phone + visit_date, any slot) ---
+        same_day_matches = db_select(
+            "visitors",
+            {
+                "phone": f"eq.{payload.phone}",
+                "visit_date": f"eq.{payload.visit_date}",
+            },
+        ) or []
+
+        same_day_warning = bool(same_day_matches)
+
+        # --- Proceed with insert ---
         today = datetime.now().strftime("%Y%m%d")
         rand = random.randint(1000, 9999)
         visit_id = f"VIS-{today}-{rand}"
@@ -51,7 +81,13 @@ def register_visitor(payload: VisitorRegister):
             },
         )
 
-        return {"success": True, "visit_id": visit_id}
+        response = {"success": True, "visit_id": visit_id}
+
+        if same_day_warning:
+            response["same_day_warning"] = True
+            response["warning_message"] = "You have another visit scheduled today."
+
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
