@@ -92,6 +92,36 @@ def register_visitor(payload: VisitorRegister):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/visitor/today")
+def get_today_visitors():
+    try:
+        from datetime import date
+        today = date.today().isoformat()
+        from datetime import timedelta
+        tomorrow = (date.today() + timedelta(days=1)).isoformat()
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+        all_result = db_select("visitors") or []
+        visitors = [
+            v for v in all_result 
+            if isinstance(all_result, list) 
+            and v.get("visit_date") in [yesterday, today, tomorrow]
+        ]
+        return {
+            "success": True,
+            "visitors": visitors,
+            "count": len(visitors),
+            "date": today
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "visitors": [],
+            "count": 0,
+            "error": str(e)
+        }
+
+
 @router.get("/visitor/{visit_id}")
 def get_visitor(visit_id: str):
     try:
