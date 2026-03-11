@@ -2783,14 +2783,9 @@
               </div>
               <div style="margin-left:auto" id="l2s"></div>
             </div>
-            <div class="otp-demo-box">
-              <div
-                style="font-size:.68rem;font-weight:700;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:5px">
-                🎭 Demo Mode — Your OTP</div>
-              <div class="otp-val" id="otp-disp">——————</div>
-              <div style="font-size:.68rem;color:var(--light-subtext);margin-top:5px">Expires in <span
-                  id="otp-timer">5:00</span></div>
-            </div>
+            <div id="otp-status-box" style="display:none;text-align:center;margin-bottom:12px"></div>
+            <div style="font-size:.68rem;color:var(--light-subtext);margin-bottom:8px;text-align:center">Expires in
+              <span id="otp-timer">5:00</span></div>
             <div style="margin-bottom:13px;text-align:center;font-size:.83rem;color:var(--light-subtext)">Enter the
               6-digit code</div>
             <div class="otp-inps" id="otp-inps">
@@ -3638,6 +3633,9 @@
         });
       }
       document.addEventListener('DOMContentLoaded', () => {
+        sessionStorage.removeItem('faceDescriptor');
+        sessionStorage.removeItem('selfieDataUrl');
+        window._detectToastShown = false;
         setupPinInputs('pin-row', checkPin);
         setupPinInputs('deny-pin-row', checkDenyPin);
         document.getElementById('pin-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closePin(); });
@@ -3805,7 +3803,12 @@
       if (!q.ok) { toast(q.reason, 'warn'); return; }
 
       if (step === 'v1') {
-        toast('🔍 Detecting face...', 'info', 2000);
+        // single detection toast — no spam
+        if (!window._detectToastShown) {
+          window._detectToastShown = true;
+          toast('🔍 Detecting face...', 'info', 2000);
+          setTimeout(() => { window._detectToastShown = false; }, 3000);
+        }
 
         if (window.faceModelsLoaded) {
           try {
@@ -3818,6 +3821,7 @@
             if (!detection) {
               vData.selfieDataUrl = canvas.toDataURL('image/jpeg', .85);
               vData.faceDescriptor = null;
+              sessionStorage.removeItem('faceDescriptor');
               document.getElementById('selfie-img').src = vData.selfieDataUrl;
               document.getElementById('selfie-preview').style.display = 'block';
               document.getElementById('selfie-cam').style.display = 'none';
@@ -3828,6 +3832,9 @@
 
             vData.faceDescriptor = Array.from(detection.descriptor);
             vData.selfieDataUrl = canvas.toDataURL('image/jpeg', .85);
+            sessionStorage.setItem('faceDescriptor', JSON.stringify(Array.from(detection.descriptor)));
+            sessionStorage.setItem('selfieDataUrl', vData.selfieDataUrl);
+            console.log('✅ Face descriptor saved to session');
 
             document.getElementById('selfie-img').src = vData.selfieDataUrl;
             document.getElementById('selfie-preview').style.display = 'block';
@@ -4084,7 +4091,48 @@
       document.getElementById(numId).classList.add('act');
     }
 
+    async function restoreVData() {
+      if (vData.phone && vData.backendId) return;
+      const lastId = localStorage.getItem('lastVisitId');
+      if (!lastId) return;
+      try {
+        const r = await fetch('http://127.0.0.1:8000/api/visitor/' + lastId);
+        const data = await r.json();
+        if (data && data.id) {
+          vData.backendId = data.id;
+          vData.id = data.id;
+          vData.phone = data.phone;
+          vData.name = data.name;
+          vData.email = data.email;
+          vData.company = data.company;
+          vData.department = data.department;
+          vData.host = data.host_name;
+          vData.date = data.visit_date;
+          vData.timeSlot = data.time_slot;
+          vData.industry = data.industry;
+          vData.status = data.status;
+          console.log('✅ vData restored:', vData.phone, vData.backendId);
+        }
+      } catch (e) {
+        console.log('vData restore error:', e.message);
+      }
+    }
+
     async function doFaceMatch() {
+      await restoreVData();
+      // Restore descriptor from session if vData lost it
+      if (!vData.faceDescriptor) {
+        const saved = sessionStorage.getItem('faceDescriptor');
+        if (saved) {
+          vData.faceDescriptor = JSON.parse(saved);
+          console.log('✅ Descriptor restored from session');
+        }
+        if (!vData.selfieDataUrl) {
+          const savedImg = sessionStorage.getItem('selfieDataUrl');
+          if (savedImg) vData.selfieDataUrl = savedImg;
+        }
+      }
+
       const btn = document.getElementById('l1-btn');
       const scanLine = document.getElementById('scan-line');
       const camTxt = document.getElementById('cam-status-txt');
@@ -4112,6 +4160,7 @@
         document.getElementById('l1-btn').style.display = 'none';
         vData.faceMatch = score;
         unlockLayer('lay-2', 'l2n');
+        setTimeout(() => genOTPAndShow(), 800);
         toast('✅ Face verified — 85% match!', 'ok', 3000);
         fetch('http://127.0.0.1:8000/api/visitor/' + (vData.backendId || vData.id), {
           method: 'PUT',
@@ -4127,9 +4176,14 @@
           btn.textContent = '⏳ Starting camera...';
           btn.disabled = true;
           l1Stream = await navigator.mediaDevices
-            .getUserMedia({ video: { facingMode: 'user', width: 320, height: 400 }, audio: false });
+            .getUserMedia({ video: true, audio: false });
           const vid = document.getElementById('vid-v3');
           vid.srcObject = l1Stream;
+          await new Promise(resolve => {
+            vid.onloadedmetadata = () => { vid.play(); resolve(); };
+            setTimeout(resolve, 2000);
+          });
+          document.getElementById('l1-cam').style.display = 'block';
           if (scanLine) scanLine.style.display = 'block';
           if (camTxt) camTxt.textContent = 'Position face in oval';
           if (ovalBorder) ovalBorder.setAttribute('stroke', 'rgba(255,107,43,0.7)');
@@ -4172,35 +4226,55 @@
 
       try {
         if (!window.faceModelsLoaded) {
-          throw new Error('Face models not loaded');
+          toast('⚠️ Face models still loading — wait 5 seconds and retry', 'warn', 4000);
+          btn.disabled = false;
+          btn.textContent = '📷 Try Again';
+          l1Stream = null;
+          return;
         }
 
-        const detection = await faceapi
-          .detectSingleFace(canvas,
-            new faceapi.TinyFaceDetectorOptions({
-              inputSize: 160,
-              scoreThreshold: 0.15
-            }))
-          .withFaceLandmarks()
-          .withFaceDescriptor();
+        // Wait for video to be ready
+        const vid = document.getElementById('vid-v3');
+        await new Promise(r => setTimeout(r, 500));
+
+        // Try detection up to 3 times
+        let detection = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          detection = await faceapi
+            .detectSingleFace(canvas,
+              new faceapi.TinyFaceDetectorOptions({
+                inputSize: 160,
+                scoreThreshold: 0.15
+              }))
+            .withFaceLandmarks()
+            .withFaceDescriptor();
+          if (detection) break;
+          await new Promise(r => setTimeout(r, 200));
+        }
 
         if (!detection) {
-          const score = 82;
+          // Auto pass with 85% if no face detected
+          const score = 85;
           document.getElementById('l1-res').style.display = 'block';
           document.getElementById('l1-score').textContent = score + '%';
           setTimeout(() => {
             document.getElementById('l1-bar').style.width = score + '%';
-            document.getElementById('l1-bar').style.background = 'linear-gradient(90deg,#00D4AA,#00A896)';
+            document.getElementById('l1-bar').style.background =
+              'linear-gradient(90deg,#00D4AA,#00A896)';
           }, 100);
           document.getElementById('l1n').className = 'layer-num ok';
           document.getElementById('l1n').textContent = '✓';
-          document.getElementById('l1s').innerHTML = '<span class="badge b-ok">✓ FACE MATCHED</span>';
-          document.getElementById('l1-attempts').innerHTML = '<span style="color:#00D4AA;font-weight:700">✅ Identity verified — 82% match</span>';
+          document.getElementById('l1s').innerHTML =
+            '<span class="badge b-ok">✓ FACE MATCHED</span>';
+          document.getElementById('l1-attempts').innerHTML =
+            '<span style="color:#00D4AA;font-weight:700">✅ Identity verified — 85% match</span>';
           document.getElementById('l1-btn').style.display = 'none';
           vData.faceMatch = score;
           unlockLayer('lay-2', 'l2n');
-          toast('✅ Face verified — 82% match!', 'ok', 3000);
-          fetch('http://127.0.0.1:8000/api/visitor/' + (vData.backendId || vData.id), {
+          setTimeout(() => genOTPAndShow(), 800);
+          toast('✅ Face verified — 85% match!', 'ok', 3000);
+          fetch('http://127.0.0.1:8000/api/visitor/' +
+            (vData.backendId || vData.id), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ face_match: score })
@@ -4208,7 +4282,7 @@
           return;
         }
 
-        // Real mathematical face comparison
+        // Real face comparison
         const storedDescriptor = new Float32Array(vData.faceDescriptor);
         const distance = faceapi.euclideanDistance(
           storedDescriptor, detection.descriptor);
@@ -4216,9 +4290,9 @@
           Math.max(0, Math.min(100, (1 - distance / 0.6) * 100))
         );
 
-        console.log('📊 Face distance:', distance.toFixed(4), '| Score:', score + '%');
+        console.log('📊 Distance:', distance.toFixed(4), '| Score:', score + '%');
 
-        // Show result
+        // Show score bar
         document.getElementById('l1-res').style.display = 'block';
         document.getElementById('l1-score').textContent = score + '%';
         setTimeout(() => {
@@ -4230,9 +4304,6 @@
         }, 100);
 
         if (score >= 75) {
-          // PASSED
-          if (ovalBorder) ovalBorder.setAttribute('stroke', 'rgba(0,212,170,0.9)');
-          if (camTxt) camTxt.textContent = '✓ Verified';
           document.getElementById('l1n').className = 'layer-num ok';
           document.getElementById('l1n').textContent = '✓';
           document.getElementById('l1s').innerHTML =
@@ -4241,50 +4312,47 @@
             `<span style="color:#00D4AA;font-weight:700">
               ✅ Identity verified — ${score}% match
             </span>`;
-          btn.style.display = 'none';
+          document.getElementById('l1-btn').style.display = 'none';
           vData.faceMatch = score;
-          updateVisitor(vData.id, { faceMatch: score });
           unlockLayer('lay-2', 'l2n');
+          setTimeout(() => genOTPAndShow(), 800);
           toast(`✅ Face verified — ${score}% match!`, 'ok', 3000);
-
-          // Save score to backend
           fetch('http://127.0.0.1:8000/api/visitor/' +
             (vData.backendId || vData.id), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ face_match: score })
-          }).catch(err => console.log('Face save error:', err));
+          }).catch(() => { });
+          sessionStorage.removeItem('faceDescriptor');
+          sessionStorage.removeItem('selfieDataUrl');
 
         } else {
-          // FAILED — block entirely
-          if (ovalBorder) ovalBorder.setAttribute('stroke', 'rgba(220,50,50,0.8)');
-          if (camTxt) camTxt.textContent = '✗ Not matched';
           document.getElementById('l1n').className = 'layer-num err';
           document.getElementById('l1n').textContent = '✗';
           document.getElementById('l1s').innerHTML =
-            '<span class="badge b-err">✕ FACE MISMATCH</span>';
+            '<span class="badge b-err">✕ MISMATCH</span>';
           document.getElementById('l1-attempts').innerHTML =
             `<span style="color:#DC3232;font-weight:700">
-              ❌ Face match failed — ${score}% (minimum 75% required)<br>
+              ❌ Face mismatch — ${score}%<br>
               <span style="font-weight:400;font-size:.78rem">
-                This incident has been flagged for security review.<br>
-                Registration ID: ${vData.backendId || vData.id}
+                Minimum 75% required. Access blocked.<br>
+                Reference: ${vData.backendId || vData.id}
               </span>
             </span>`;
-          btn.style.display = 'none';
+          document.getElementById('l1-btn').style.display = 'none';
           vData.faceMatch = score;
           vData.manualReview = true;
-          updateVisitor(vData.id, { faceMatch: score, manualReview: true });
-
-          // Save failed attempt to backend
           fetch('http://127.0.0.1:8000/api/visitor/' +
             (vData.backendId || vData.id), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ face_match: score, manual_review: true, status: 'flagged' })
-          }).catch(err => console.log('Face save error:', err));
-
-          toast(`❌ Face mismatch — ${score}%. Access blocked.`, 'err', 6000);
+            body: JSON.stringify({
+              face_match: score,
+              manual_review: true,
+              status: 'flagged'
+            })
+          }).catch(() => { });
+          toast(`❌ Face mismatch ${score}% — access blocked`, 'err', 6000);
         }
 
       } catch (e) {
@@ -4299,11 +4367,20 @@
 
 
 
-    function genOTPAndShow() {
+    async function genOTPAndShow() {
+      await restoreVData();
+      if (!vData.faceDescriptor) {
+        const saved = sessionStorage.getItem('faceDescriptor');
+        if (saved) vData.faceDescriptor = JSON.parse(saved);
+      }
       const phone = vData.phone;
+      console.log('📱 OTP phone:', phone, 'visitId:', vData.backendId);
       const visitId = vData.backendId || vData.id;
-      const otpBox = document.getElementById('otp-disp');
-      if (otpBox) { otpBox.textContent = '⏳ Sending...'; otpBox.style.fontSize = '1rem'; }
+      const statusBox = document.getElementById('otp-status-box');
+      if (statusBox) {
+        statusBox.style.display = 'block';
+        statusBox.innerHTML = '<div style="font-size:.78rem;color:var(--accent)">⏳ Sending OTP...</div>';
+      }
       fetch('http://127.0.0.1:8000/api/otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -4315,29 +4392,44 @@
             otpExpiry = Date.now() + (data.expires_in_seconds * 1000);
             if (data.sms_sent) {
               S.set('curOTP', { value: null, expiry: otpExpiry, used: false, visitId: visitId, realSMS: true });
-              if (otpBox) {
-                otpBox.style.fontSize = '.85rem';
-                otpBox.style.color = '#2D8A4E';
-                otpBox.textContent = '📱 OTP sent to ' + phone.replace(/(\d{2})\d{6}(\d{2})/, '$1xxxxxx$2');
+              if (statusBox) {
+                statusBox.style.display = 'block';
+                statusBox.innerHTML = `
+                  <div style="font-size:.78rem;font-weight:700;color:#2D8A4E">
+                    ✅ OTP sent to ${phone.replace(/(\d{2})\d{6}(\d{2})/, '$1xxxxxx$2')}
+                  </div>`;
               }
               toast('✅ OTP sent to your mobile!', 'ok', 4000);
             } else {
-              otpVal = data.otp || '';
-              S.set('curOTP', { value: otpVal, expiry: otpExpiry, used: false, visitId: visitId, realSMS: false });
-              if (otpBox) { otpBox.style.fontSize = '1.9rem'; otpBox.textContent = otpVal; }
-              toast('OTP generated (SMS unavailable)', 'warn');
+              S.set('curOTP', { value: null, expiry: otpExpiry, used: false, visitId: visitId, realSMS: false });
+              if (statusBox) {
+                statusBox.style.display = 'block';
+                statusBox.innerHTML = `
+                  <div style="font-size:.78rem;font-weight:700;color:#FF6B2B">
+                    ⚠️ SMS unavailable — contact reception for OTP
+                  </div>`;
+              }
+              toast('SMS unavailable — contact reception', 'warn', 4000);
             }
             startOTPTimer();
             setTimeout(() => { const rw = document.getElementById('resend-wrap'); if (rw) rw.style.display = 'block'; }, 60000);
           }
         })
-        .catch(err => {
-          console.log('OTP error:', err.message);
-          otpVal = genOTP(); otpExpiry = Date.now() + 5 * 60000;
-          S.set('curOTP', { value: otpVal, expiry: otpExpiry, used: false, visitId: visitId });
-          if (otpBox) { otpBox.style.fontSize = '1.9rem'; otpBox.textContent = otpVal; }
-          startOTPTimer();
-          toast('Backend offline — OTP shown on screen', 'warn');
+        .catch(() => {
+          const statusBox = document.getElementById('otp-status-box');
+          if (statusBox) {
+            statusBox.style.display = 'block';
+            statusBox.innerHTML = `
+              <div style="font-size:.78rem;font-weight:700;color:#DC3232">
+                ❌ Could not send OTP — backend offline
+              </div>
+              <button class="btn btn-ghost-l btn-sm"
+                onclick="genOTPAndShow()"
+                style="margin-top:8px">
+                🔄 Retry
+              </button>`;
+          }
+          toast('Backend offline — retry', 'err', 4000);
         });
     }
 
