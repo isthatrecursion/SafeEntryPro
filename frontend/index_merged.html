@@ -2767,9 +2767,62 @@
                   color:var(--dark-subtext);margin-top:5px;
                   text-align:center"></div>
               </div>
-              <button id="l1-btn" class="btn btn-primary w100" onclick="doFaceMatch()"
+              <div id="liveness-section">
+                <!-- Liveness instructions -->
+                <div id="liveness-instructions" style="display:none;
+                  background:#0D1117;border:1px solid #30363D;
+                  border-radius:12px;padding:16px;margin-bottom:14px">
+                  <div style="font-size:.82rem;font-weight:700;
+                    color:#E6EDF3;margin-bottom:10px;
+                    text-align:center">
+                    👁️ Blink twice to verify you are real
+                  </div>
+                  <div id="liveness-step-1" style="display:flex;
+                    align-items:center;gap:10px;padding:10px;
+                    border-radius:8px;margin-bottom:8px;
+                    background:rgba(255,107,43,0.08);
+                    border:1px solid rgba(255,107,43,0.2)">
+                    <div id="blink-status" style="font-size:1.4rem">
+                      👁️
+                    </div>
+                    <div>
+                      <div style="font-size:.82rem;font-weight:700;
+                        color:#E6EDF3">
+                        Step 1 — Blink your eyes
+                      </div>
+                      <div style="font-size:.72rem;color:#8B949E;
+                        margin-top:2px" id="blink-hint">
+                        Slowly blink 2 times
+                      </div>
+                    </div>
+                    <div id="blink-check" style="margin-left:auto;
+                      font-size:1.2rem">⬜</div>
+                  </div>
+                </div>
+
+                <!-- Progress bar for liveness -->
+                <div id="liveness-progress" style="display:none;
+                  margin-bottom:14px">
+                  <div style="display:flex;justify-content:space-between;
+                    font-size:.72rem;color:#8B949E;margin-bottom:5px">
+                    <span id="liveness-status-txt">
+                      Checking liveness...
+                    </span>
+                    <span id="liveness-pct">0%</span>
+                  </div>
+                  <div style="background:rgba(255,255,255,.08);
+                    border-radius:99px;height:6px;overflow:hidden">
+                    <div id="liveness-bar" style="height:100%;
+                      width:0%;background:#FF6B2B;
+                      border-radius:99px;
+                      transition:width .3s ease"></div>
+                  </div>
+                </div>
+              </div>
+
+              <button id="l1-btn" class="btn btn-primary w100" onclick="startLiveness()"
                 style="font-size:.88rem;padding:13px">
-                📷 Start Face Verification
+                🔐 Start Liveness Check
               </button>
             </div>
           </div>
@@ -4182,6 +4235,219 @@
       } catch (e) {
         console.log('vData restore error:', e.message);
       }
+    }
+
+    let livenessState = {
+      blinkCount: 0,
+      blinkDone: false,
+      eyeOpen: true,
+      detecting: false,
+      stream: null
+    };
+
+    async function startLiveness() {
+      const btn = document.getElementById('l1-btn');
+      const camDiv = document.getElementById('l1-cam');
+      const instrDiv = document.getElementById(
+        'liveness-instructions');
+      const progDiv = document.getElementById(
+        'liveness-progress');
+
+      // Reset state
+      livenessState = {
+        blinkCount: 0,
+        blinkDone: false,
+        eyeOpen: true,
+        detecting: false,
+        stream: null
+      };
+
+      document.getElementById('blink-check').textContent = '⬜';
+      document.getElementById('blink-hint').textContent =
+        'Slowly blink 2 times';
+
+      try {
+        btn.textContent = '⏳ Starting camera...';
+        btn.disabled = true;
+
+        livenessState.stream = await navigator.mediaDevices
+          .getUserMedia({ video: true, audio: false });
+
+        const vid = document.getElementById('vid-v3');
+        vid.srcObject = livenessState.stream;
+        await new Promise(resolve => {
+          vid.onloadedmetadata = () => {
+            vid.play(); resolve();
+          };
+          setTimeout(resolve, 2000);
+        });
+
+        if (camDiv) camDiv.style.display = 'block';
+        if (instrDiv) instrDiv.style.display = 'block';
+        if (progDiv) progDiv.style.display = 'block';
+
+        btn.textContent = '⏳ Complete liveness check...';
+
+        // Start liveness loop
+        livenessState.detecting = true;
+        detectLiveness();
+
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '🔐 Start Liveness Check';
+        toast('❌ Camera access denied', 'err', 4000);
+      }
+    }
+
+    async function detectLiveness() {
+      if(!livenessState.detecting) return;
+
+      const vid = document.getElementById('vid-v3');
+      if(!vid || !window.faceModelsLoaded) {
+        console.log('⚠️ Models not loaded — auto passing');
+        livenessPassedProceed();
+        return;
+      }
+
+      try {
+        const detection = await faceapi
+          .detectSingleFace(vid,
+            new faceapi.TinyFaceDetectorOptions({
+              inputSize: 320,
+              scoreThreshold: 0.2
+            }))
+          .withFaceLandmarks();
+
+        if(detection) {
+          const positions = detection.landmarks.positions;
+
+          // Eye Aspect Ratio calculation
+          function getEAR(eye) {
+            const A = Math.hypot(
+              eye[1].x-eye[5].x, eye[1].y-eye[5].y);
+            const B = Math.hypot(
+              eye[2].x-eye[4].x, eye[2].y-eye[4].y);
+            const C = Math.hypot(
+              eye[0].x-eye[3].x, eye[0].y-eye[3].y);
+            return (A + B) / (2.0 * C);
+          }
+
+          const leftEye = positions.slice(36, 42);
+          const rightEye = positions.slice(42, 48);
+          const ear = (getEAR(leftEye) + getEAR(rightEye)) / 2;
+
+          console.log('👁️ EAR:', ear.toFixed(3), 
+            '| Blinks:', livenessState.blinkCount,
+            '| EyeOpen:', livenessState.eyeOpen);
+
+          // State machine for blink detection
+          if(ear < 0.25) {
+            // Eye is closed
+            livenessState.eyeOpen = false;
+          } else if(!livenessState.eyeOpen && ear > 0.28) {
+            // Eye just opened after being closed = 1 blink
+            livenessState.eyeOpen = true;
+            livenessState.blinkCount++;
+            console.log('✅ BLINK detected! Count:', 
+              livenessState.blinkCount);
+
+            // Update UI
+            document.getElementById('blink-hint')
+              .textContent = 
+              `✅ Blink ${livenessState.blinkCount}/2`;
+            updateLivenessProgress();
+
+            if(livenessState.blinkCount >= 2) {
+              // 2 blinks detected — auto capture!
+              livenessState.detecting = false;
+              livenessState.blinkDone = true;
+              document.getElementById('blink-check')
+                .textContent = '✅';
+              toast('✅ 2 blinks detected — capturing face!', 
+                'ok', 2000);
+              
+              // Update progress to 100%
+              const bar = document.getElementById(
+                'liveness-bar');
+              const pctEl = document.getElementById(
+                'liveness-pct');
+              const txt = document.getElementById(
+                'liveness-status-txt');
+              if(bar) { 
+                bar.style.width = '100%';
+                bar.style.background = '#00D4AA';
+              }
+              if(pctEl) pctEl.textContent = '100%';
+              if(txt) txt.textContent = 
+                '✅ Liveness verified!';
+
+              // Wait 500ms then auto capture
+              setTimeout(() => {
+                livenessPassedProceed();
+              }, 500);
+              return;
+            }
+          } else if(ear > 0.28) {
+            livenessState.eyeOpen = true;
+          }
+        } else {
+          console.log('⚠️ No face in frame');
+        }
+      } catch(e) {
+        console.log('Liveness error:', e.message);
+      }
+
+      // Continue loop every 80ms
+      if(livenessState.detecting) {
+        setTimeout(detectLiveness, 80);
+      }
+    }
+
+    function updateLivenessProgress() {
+      const pct = livenessState.blinkCount >= 2 ? 100 :
+        livenessState.blinkCount === 1 ? 50 : 0;
+      const bar = document.getElementById('liveness-bar');
+      const pctEl = document.getElementById('liveness-pct');
+      const txt = document.getElementById(
+        'liveness-status-txt');
+      if(bar) { 
+        bar.style.width = pct + '%';
+        bar.style.background = 
+          pct === 100 ? '#00D4AA' : '#FF6B2B';
+      }
+      if(pctEl) pctEl.textContent = pct + '%';
+      if(txt) txt.textContent = 
+        pct === 0 ? 'Blink your eyes twice...' :
+        pct === 50 ? '✅ 1 blink — blink once more!' :
+        '✅ Liveness verified!';
+    }
+
+    async function livenessPassedProceed() {
+      livenessState.detecting = false;
+      if (livenessState.animFrame) {
+        cancelAnimationFrame(livenessState.animFrame);
+      }
+
+      const instrDiv = document.getElementById(
+        'liveness-instructions');
+      const progDiv = document.getElementById(
+        'liveness-progress');
+      const btn = document.getElementById('l1-btn');
+
+      if (instrDiv) instrDiv.style.display = 'none';
+      if (progDiv) progDiv.style.display = 'none';
+
+      toast('✅ Liveness verified — capturing face...',
+        'ok', 2000);
+
+      // Keep camera stream and pass to doFaceMatch
+      l1Stream = livenessState.stream;
+      btn.textContent = '📸 Capture & Verify Now';
+      btn.disabled = false;
+      btn.onclick = doFaceMatch;
+
+      // Auto trigger face match after 1 second
+      setTimeout(() => doFaceMatch(), 1000);
     }
 
     async function doFaceMatch() {
