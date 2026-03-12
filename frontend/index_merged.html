@@ -2405,6 +2405,380 @@
         display: none
       }
     }
+
+    /* ── WAVE GROUP INPUTS ── */
+    .wave-group {
+      position: relative;
+      margin-bottom: 24px;
+      width: 100%;
+    }
+
+    .wave-group .input {
+      font-size: 16px;
+      padding: 10px 10px 10px 5px;
+      display: block;
+      width: 100%;
+      border: none;
+      border-bottom: 2px solid #515151;
+      background: #ffffff;
+      color: #111111 !important;
+      -webkit-text-fill-color: #111111 !important;
+      box-sizing: border-box;
+      border-radius: 4px 4px 0 0;
+    }
+
+    .wave-group .input:focus {
+      outline: none;
+      background: #ffffff;
+    }
+
+    .wave-group select.input {
+      color: #111111 !important;
+      -webkit-text-fill-color: #111111 !important;
+      background: #ffffff !important;
+      cursor: pointer;
+    }
+
+    .wave-group select.input option {
+      color: #111111 !important;
+      background: #ffffff !important;
+    }
+
+    .wave-group textarea.input {
+      color: #111111 !important;
+      -webkit-text-fill-color: #111111 !important;
+      background: #ffffff !important;
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .wave-group .label {
+      color: #999;
+      font-size: 16px;
+      font-weight: normal;
+      position: absolute;
+      pointer-events: none;
+      left: 5px;
+      top: 10px;
+      display: flex;
+      gap: 0px;
+    }
+
+    .wave-group .label-char {
+      transition: 0.2s ease all;
+      transition-delay: calc(var(--index) * .05s);
+    }
+
+    .wave-group .input:focus~label .label-char,
+    .wave-group .input:valid~label .label-char {
+      transform: translateY(-20px);
+      font-size: 13px;
+      color: #FF6B2B;
+    }
+
+    .wave-group .bar {
+      position: relative;
+      display: block;
+      width: 100%;
+    }
+
+    .wave-group .bar:before,
+    .wave-group .bar:after {
+      content: '';
+      height: 2px;
+      width: 0;
+      bottom: 1px;
+      position: absolute;
+      background: #FF6B2B;
+      transition: 0.2s ease all;
+    }
+
+    .wave-group .bar:before {
+      left: 50%;
+    }
+
+    .wave-group .bar:after {
+      right: 50%;
+    }
+
+    .wave-group .input:focus~.bar:before,
+    .wave-group .input:focus~.bar:after {
+      width: 50%;
+    }
+
+    .wave-group .input:-webkit-autofill {
+      -webkit-text-fill-color: #111111 !important;
+      -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+    }
+
+    /* ── DOWNLOAD BUTTON ── */
+    .dl-container {
+      padding: 0;
+      margin: 0;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .dl-label {
+      background-color: transparent;
+      border: 2px solid #FF6B2B;
+      display: flex;
+      align-items: center;
+      border-radius: 50px;
+      width: 160px;
+      cursor: pointer;
+      transition: all 0.4s ease;
+      padding: 5px;
+      position: relative;
+    }
+
+    .dl-label::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background-color: #fff;
+      width: 8px;
+      height: 8px;
+      transition: all 0.4s ease;
+      border-radius: 100%;
+      margin: auto;
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .dl-label .dl-input {
+      display: none;
+    }
+
+    .dl-label .dl-title {
+      font-size: 17px;
+      color: #fff;
+      transition: all 0.4s ease;
+      position: absolute;
+      right: 18px;
+      bottom: 14px;
+      text-align: center;
+    }
+
+    .dl-label .dl-title:last-child {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .dl-label .dl-circle {
+      height: 45px;
+      width: 45px;
+      border-radius: 50%;
+      background-color: #FF6B2B;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.4s ease;
+      position: relative;
+      box-shadow: 0 0 0 0 rgb(255, 255, 255);
+      overflow: hidden;
+    }
+
+    .dl-label .dl-circle .dl-icon {
+      color: #fff;
+      width: 30px;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.4s ease;
+    }
+
+    .dl-label .dl-circle .dl-square {
+      aspect-ratio: 1;
+      width: 15px;
+      border-radius: 2px;
+      background-color: #fff;
+      opacity: 0;
+      visibility: hidden;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: all 0.4s ease;
+    }
+
+    .dl-label .dl-circle::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      background-color: #cc4400;
+      width: 100%;
+      height: 0;
+      transition: all 0.4s ease;
+    }
+
+    .dl-label:has(.dl-input:checked) {
+      width: 57px;
+      animation: dlInstalled 0.4s ease 3.5s forwards;
+    }
+
+    .dl-label:has(.dl-input:checked)::before {
+      animation: dlRotate 3s ease-in-out 0.4s forwards;
+    }
+
+    .dl-label .dl-input:checked+.dl-circle {
+      animation: dlPulse 1s forwards,
+        dlCircleDelete 0.2s ease 3.5s forwards;
+      rotate: 180deg;
+    }
+
+    .dl-label .dl-input:checked+.dl-circle::before {
+      animation: dlInstalling 3s ease-in-out forwards;
+    }
+
+    .dl-label .dl-input:checked+.dl-circle .dl-icon {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .dl-label .dl-input:checked~.dl-circle .dl-square {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .dl-label .dl-input:checked~.dl-title {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .dl-label .dl-input:checked~.dl-title:last-child {
+      animation: dlShowMsg 0.4s ease 3.5s forwards;
+    }
+
+    @keyframes dlPulse {
+      0% {
+        scale: .95;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, .7)
+      }
+
+      70% {
+        scale: 1;
+        box-shadow: 0 0 0 16px rgba(255, 255, 255, 0)
+      }
+
+      100% {
+        scale: .95;
+        box-shadow: 0 0 0 0 rgba(255, 255, 255, 0)
+      }
+    }
+
+    @keyframes dlInstalling {
+      from {
+        height: 0
+      }
+
+      to {
+        height: 100%
+      }
+    }
+
+    @keyframes dlRotate {
+      0% {
+        transform: rotate(-90deg) translate(27px) rotate(0);
+        opacity: 1;
+        visibility: visible
+      }
+
+      99% {
+        transform: rotate(270deg) translate(27px) rotate(270deg);
+        opacity: 1;
+        visibility: visible
+      }
+
+      100% {
+        opacity: 0;
+        visibility: hidden
+      }
+    }
+
+    @keyframes dlInstalled {
+      100% {
+        width: 150px;
+        border-color: #00D4AA
+      }
+    }
+
+    @keyframes dlCircleDelete {
+      100% {
+        opacity: 0;
+        visibility: hidden
+      }
+    }
+
+    @keyframes dlShowMsg {
+      100% {
+        opacity: 1;
+        visibility: visible;
+        right: 56px
+      }
+    }
+
+    /* ── WHATSAPP BUTTON ── */
+    .wa-btn {
+      font-family: inherit;
+      font-size: 18px;
+      background: #25D366;
+      color: white;
+      padding: 0.7em 1em;
+      padding-left: 0.9em;
+      display: flex;
+      align-items: center;
+      border: none;
+      border-radius: 16px;
+      overflow: hidden;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .wa-btn span {
+      display: block;
+      margin-left: 0.3em;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .wa-btn svg {
+      display: block;
+      transform-origin: center center;
+      transition: transform 0.3s ease-in-out;
+    }
+
+    .wa-btn:hover .svg-wrapper {
+      animation: wa-fly 0.6s ease-in-out infinite alternate;
+    }
+
+    .wa-btn:hover svg {
+      transform: translateX(1.2em) rotate(45deg) scale(1.1);
+    }
+
+    .wa-btn:hover span {
+      transform: translateX(5em);
+    }
+
+    .wa-btn:active {
+      transform: scale(0.95);
+    }
+
+    @keyframes wa-fly {
+      from {
+        transform: translateY(0.1em);
+      }
+
+      to {
+        transform: translateY(-0.1em);
+      }
+    }
   </style>
 </head>
 
@@ -2563,16 +2937,73 @@
         <div class="form-card">
           <div class="f-stack">
             <div class="f-grid">
-              <div class="f-group"><label class="f-label f-label-l">Full Name *</label><input id="v-name"
-                  class="f-input f-input-l" type="text" placeholder="Rajesh Kumar" autocomplete="name"></div>
-              <div class="f-group"><label class="f-label f-label-l">Phone Number *</label><input id="v-phone"
-                  class="f-input f-input-l" type="tel" placeholder="9876543210" inputmode="numeric"></div>
+              <div class="wave-group">
+                <input required type="text" id="v-name" class="input" autocomplete="off">
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">F</span>
+                  <span class="label-char" style="--index:1">u</span>
+                  <span class="label-char" style="--index:2">l</span>
+                  <span class="label-char" style="--index:3">l</span>
+                  <span class="label-char" style="--index:4"> </span>
+                  <span class="label-char" style="--index:5">N</span>
+                  <span class="label-char" style="--index:6">a</span>
+                  <span class="label-char" style="--index:7">m</span>
+                  <span class="label-char" style="--index:8">e</span>
+                </label>
+              </div>
+              <div class="wave-group">
+                <input required type="tel" id="v-phone" class="input" autocomplete="off" inputmode="numeric">
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">P</span>
+                  <span class="label-char" style="--index:1">h</span>
+                  <span class="label-char" style="--index:2">o</span>
+                  <span class="label-char" style="--index:3">n</span>
+                  <span class="label-char" style="--index:4">e</span>
+                  <span class="label-char" style="--index:5"> </span>
+                  <span class="label-char" style="--index:6">N</span>
+                  <span class="label-char" style="--index:7">u</span>
+                  <span class="label-char" style="--index:8">m</span>
+                  <span class="label-char" style="--index:9">b</span>
+                  <span class="label-char" style="--index:10">e</span>
+                  <span class="label-char" style="--index:11">r</span>
+                </label>
+              </div>
             </div>
             <div class="f-grid">
-              <div class="f-group"><label class="f-label f-label-l">Email *</label><input id="v-email"
-                  class="f-input f-input-l" type="email" placeholder="you@company.com"></div>
-              <div class="f-group"><label class="f-label f-label-l">Company *</label><input id="v-company"
-                  class="f-input f-input-l" type="text" placeholder="Acme Corp"></div>
+              <div class="wave-group">
+                <input required type="email" id="v-email" class="input" autocomplete="off">
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">E</span>
+                  <span class="label-char" style="--index:1">m</span>
+                  <span class="label-char" style="--index:2">a</span>
+                  <span class="label-char" style="--index:3">i</span>
+                  <span class="label-char" style="--index:4">l</span>
+                  <span class="label-char" style="--index:5"> </span>
+                  <span class="label-char" style="--index:6">A</span>
+                  <span class="label-char" style="--index:7">d</span>
+                  <span class="label-char" style="--index:8">d</span>
+                  <span class="label-char" style="--index:9">r</span>
+                  <span class="label-char" style="--index:10">e</span>
+                  <span class="label-char" style="--index:11">s</span>
+                  <span class="label-char" style="--index:12">s</span>
+                </label>
+              </div>
+              <div class="wave-group">
+                <input required type="text" id="v-company" class="input" autocomplete="off">
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">C</span>
+                  <span class="label-char" style="--index:1">o</span>
+                  <span class="label-char" style="--index:2">m</span>
+                  <span class="label-char" style="--index:3">p</span>
+                  <span class="label-char" style="--index:4">a</span>
+                  <span class="label-char" style="--index:5">n</span>
+                  <span class="label-char" style="--index:6">y</span>
+                </label>
+              </div>
             </div>
             <div class="f-group">
               <label class="f-label f-label-l">Government ID *</label>
@@ -2618,24 +3049,82 @@
         <div class="form-card">
           <div class="f-stack">
             <div class="f-grid">
-              <div class="f-group"><label class="f-label f-label-l">Visitor Type *</label><select id="v-vtype"
-                  class="f-input f-input-l">
+              <div class="wave-group">
+                <select id="v-vtype" required class="input">
                   <option value="">Select type…</option>
-                </select></div>
-              <div class="f-group"><label class="f-label f-label-l">Department *</label><select id="v-dept"
-                  class="f-input f-input-l">
+                </select>
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">V</span>
+                  <span class="label-char" style="--index:1">i</span>
+                  <span class="label-char" style="--index:2">s</span>
+                  <span class="label-char" style="--index:3">i</span>
+                  <span class="label-char" style="--index:4">t</span>
+                  <span class="label-char" style="--index:5">o</span>
+                  <span class="label-char" style="--index:6">r</span>
+                  <span class="label-char" style="--index:7"> </span>
+                  <span class="label-char" style="--index:8">T</span>
+                  <span class="label-char" style="--index:9">y</span>
+                  <span class="label-char" style="--index:10">p</span>
+                  <span class="label-char" style="--index:11">e</span>
+                </label>
+              </div>
+              <div class="wave-group">
+                <select id="v-dept" required class="input">
                   <option value="">Select dept…</option>
-                </select></div>
+                </select>
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">D</span>
+                  <span class="label-char" style="--index:1">e</span>
+                  <span class="label-char" style="--index:2">p</span>
+                  <span class="label-char" style="--index:3">a</span>
+                  <span class="label-char" style="--index:4">r</span>
+                  <span class="label-char" style="--index:5">t</span>
+                  <span class="label-char" style="--index:6">m</span>
+                  <span class="label-char" style="--index:7">e</span>
+                  <span class="label-char" style="--index:8">n</span>
+                  <span class="label-char" style="--index:9">t</span>
+                </label>
+              </div>
             </div>
             <div class="f-grid">
-              <div class="f-group"><label class="f-label f-label-l">Host Name *</label><input id="v-host"
-                  class="f-input f-input-l" type="text" placeholder="Priya Sharma"></div>
-              <div class="f-group"><label class="f-label f-label-l">Designation</label><input id="v-desig"
-                  class="f-input f-input-l" type="text" placeholder="Plant Manager"></div>
+              <div class="wave-group">
+                <input required type="text" id="v-host" class="input" autocomplete="off">
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">H</span>
+                  <span class="label-char" style="--index:1">o</span>
+                  <span class="label-char" style="--index:2">s</span>
+                  <span class="label-char" style="--index:3">t</span>
+                  <span class="label-char" style="--index:4"> </span>
+                  <span class="label-char" style="--index:5">N</span>
+                  <span class="label-char" style="--index:6">a</span>
+                  <span class="label-char" style="--index:7">m</span>
+                  <span class="label-char" style="--index:8">e</span>
+                </label>
+              </div>
+              <div class="wave-group">
+                <input required type="text" id="v-desig" class="input" autocomplete="off">
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">D</span>
+                  <span class="label-char" style="--index:1">e</span>
+                  <span class="label-char" style="--index:2">s</span>
+                  <span class="label-char" style="--index:3">i</span>
+                  <span class="label-char" style="--index:4">g</span>
+                  <span class="label-char" style="--index:5">n</span>
+                  <span class="label-char" style="--index:6">a</span>
+                  <span class="label-char" style="--index:7">t</span>
+                  <span class="label-char" style="--index:8">i</span>
+                  <span class="label-char" style="--index:9">o</span>
+                  <span class="label-char" style="--index:10">n</span>
+                </label>
+              </div>
             </div>
             <div class="f-grid">
-              <div class="f-group"><label class="f-label f-label-l">Purpose *</label>
-                <select id="v-purpose" class="f-input f-input-l">
+              <div class="wave-group">
+                <select id="v-purpose" required class="input">
                   <option value="">Select…</option>
                   <option>Business Meeting</option>
                   <option>Quality Audit</option>
@@ -2645,6 +3134,16 @@
                   <option>Interview</option>
                   <option>Other</option>
                 </select>
+                <span class="bar"></span>
+                <label class="label">
+                  <span class="label-char" style="--index:0">P</span>
+                  <span class="label-char" style="--index:1">u</span>
+                  <span class="label-char" style="--index:2">r</span>
+                  <span class="label-char" style="--index:3">p</span>
+                  <span class="label-char" style="--index:4">o</span>
+                  <span class="label-char" style="--index:5">s</span>
+                  <span class="label-char" style="--index:6">e</span>
+                </label>
               </div>
               <div class="f-group"><label class="f-label f-label-l">Date *</label><input id="v-date"
                   class="f-input f-input-l" type="date"></div>
@@ -2652,8 +3151,17 @@
             <div class="f-group"><label class="f-label f-label-l">Time Slot *</label>
               <div id="slot-grid" class="f-stack"></div>
             </div>
-            <div class="f-group"><label class="f-label f-label-l">Notes</label><textarea id="v-notes"
-                class="f-input f-input-l" rows="2" placeholder="Additional details…"></textarea></div>
+            <div class="wave-group">
+              <textarea id="v-notes" required class="input" rows="2"></textarea>
+              <span class="bar"></span>
+              <label class="label">
+                <span class="label-char" style="--index:0">N</span>
+                <span class="label-char" style="--index:1">o</span>
+                <span class="label-char" style="--index:2">t</span>
+                <span class="label-char" style="--index:3">e</span>
+                <span class="label-char" style="--index:4">s</span>
+              </label>
+            </div>
           </div>
         </div>
         <div id="reg-duplicate-banner"></div>
@@ -2864,10 +3372,36 @@
       <div class="v-panel" id="vp-4">
         <h1 class="pnl-title">Your Visit Pass</h1>
         <p class="pnl-sub">Show this pass at the gate with your Government ID.</p>
-        <div id="pass-wrap"></div>
+        <div id="pass-wrap" style="margin-bottom:20px;max-width:520px;margin-left:auto;margin-right:auto"></div>
         <div class="pass-acts" style="display:flex;gap:14px">
-          <button class="btn btn-primary" style="flex:1" onclick="downloadPass()">⬇️ Download PDF</button>
-          <button class="btn btn-ghost-l" style="flex:1" onclick="shareWA()">💬 WhatsApp</button>
+          <div class="dl-container">
+            <label class="dl-label" onclick="handleDownloadClick(this)">
+              <input type="checkbox" class="dl-input" />
+              <span class="dl-circle">
+                <svg class="dl-icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none"
+                  viewBox="0 0 24 24">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                    d="M12 19V5m0 14-4-4m4 4 4-4"></path>
+                </svg>
+                <div class="dl-square"></div>
+              </span>
+              <p class="dl-title">Download</p>
+              <p class="dl-title">Done!</p>
+            </label>
+          </div>
+          <button class="wa-btn" onclick="shareWA()">
+            <div class="svg-wrapper-1">
+              <div class="svg-wrapper">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+                  <path fill="none" d="M0 0h24v24H0z"></path>
+                  <path fill="currentColor"
+                    d="M1.946 9.315c-.522-.174-.527-.455.01-.634l19.087-6.362c.529-.176.832.12.684.638l-5.454 19.086c-.15.529-.455.547-.679.045L12 14l6-8-8 6-8.054-2.685z">
+                  </path>
+                </svg>
+              </div>
+            </div>
+            <span>Send to WhatsApp</span>
+          </button>
         </div>
         <div
           style="background:var(--light-surface);border:1px solid var(--light-border);border-radius:var(--r-md);padding:14px 18px;font-size:.8rem;color:var(--light-subtext);line-height:1.7">
@@ -4882,63 +5416,115 @@
 
       const tmpl = TEMPLATES[v.industry || 'manufacturing'];
       const slotObj = TIME_SLOTS.find(s => s.slot === v.timeSlot) || { label: v.timeSlot || 'Scheduled' };
-      const zones = tmpl.accessZones.slice(0, 3).join(', ');
+      const zonesArr = Array.isArray(tmpl.accessZones) ? tmpl.accessZones.slice(0, 3) : [];
+      const zones = zonesArr.join(', ');
       const visitId = v.backendId || v.id;
-      const qrData = JSON.stringify({
+      const baseUrl = window.location.origin + window.location.pathname;
+      const visitorParams = new URLSearchParams({
         passId: v.passId || visitId,
         visitId: visitId,
-        name: v.name,
-        company: v.company,
-        phone: v.phone,
-        department: v.department,
-        host: v.host,
-        visitorType: v.visitorType,
-        purpose: v.purpose,
-        date: v.date,
-        slot: v.timeSlot,
-        zones: zones,
+        name: v.name || '',
+        company: v.company || '',
+        phone: v.phone || '',
+        department: v.department || '',
+        host: v.host || '',
+        visitorType: v.visitorType || '',
+        purpose: v.purpose || '',
+        date: v.date || '',
+        slot: v.timeSlot || '',
+        zones: zonesArr.join(','),
         faceMatch: v.faceMatch || 0,
         otpVerified: v.otpVerified || false,
-        industry: v.industry || 'manufacturing'
-      });
+        industry: v.industry || '',
+        email: v.email || ''
+      }).toString();
+      const qrUrl = baseUrl + '?visitor=' + encodeURIComponent(visitorParams);
+      const qrData = qrUrl;
+      window._lastQrData = qrUrl;
       console.log('✅ QR Data:', qrData);
       const isExp = v.date && new Date(v.date) < new Date(new Date().toDateString());
-      document.getElementById('pass-wrap').innerHTML = `
-    <div class="pass-card">
-      <div class="pass-head">
-        <div class="pass-head-logo">🛡️ Safe Entry Pro</div>
-        <div style="font-family:var(--font-m);font-size:.68rem;opacity:.85">${v.id}</div>
-      </div>
-      <div class="pass-body">
-        <div class="pass-vis-row">
-          <div class="pass-photo">${v.selfieDataUrl ? `<img src="${v.selfieDataUrl}">` : '<div class="pass-photo-ph">👤</div>'}</div>
-          <div><div class="pass-name">${v.name}</div><div class="pass-co">${v.company}</div><div class="badge b-acc" style="margin-top:5px">${v.visitorType}</div></div>
-        </div>
-        <div class="pass-grid">
-          <div class="pass-field"><label>Department</label><span>${v.department}</span></div>
-          <div class="pass-field"><label>Host</label><span>${v.host}${v.designation ? ', ' + v.designation : ''}</span></div>
-          <div class="pass-field"><label>Purpose</label><span>${v.purpose}</span></div>
-          <div class="pass-field"><label>Industry</label><span>${tmpl.emoji} ${tmpl.name.split(' ')[0]}</span></div>
-          <div class="pass-field" style="grid-column:1/-1"><label>Valid On</label><span>${fmtDate(v.date)} · ${slotObj.label}</span></div>
-          <div class="pass-field" style="grid-column:1/-1"><label>Permitted Zones</label><span>${zones}</span></div>
-        </div>
-        <div class="pass-qr-sec">
-          <div style="font-size:.68rem;color:var(--light-subtext);letter-spacing:.05em">SCAN AT GATE</div>
-          <div id="qr-out" style="padding:11px;background:#fff;border-radius:7px"></div>
-          <div style="font-family:var(--font-m);font-size:.72rem;color:var(--light-subtext)">${v.id}</div>
-        </div>
-      </div>
-      ${isExp ? '<div class="pass-exp">⚠️ PASS EXPIRED</div>' : ''}
-    </div>`;
+      var selfieHtml = v.selfieDataUrl
+        ? '<img src="' + v.selfieDataUrl + '" style="width:80px;height:80px;border-radius:10px;object-fit:cover;border:2px solid #FF6B2B">'
+        : '<div style="width:80px;height:80px;border-radius:10px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:2rem;border:2px solid #FF6B2B">👤</div>';
+      var zonesHtml = zonesArr.map(function (z) {
+        return '<span style="display:flex;align-items:center;gap:5px;font-size:.75rem;color:#111"><span style="width:8px;height:8px;border-radius:50%;background:#00D4AA;display:inline-block"></span>' + z + '</span>';
+      }).join('');
+      var otpBadgeBg = v.otpVerified ? '#00D4AA' : '#FF6B2B';
+      var otpBadgeText = v.otpVerified ? '✅ OTP Verified' : '⏳ OTP Pending';
+      var industryText = tmpl ? tmpl.emoji + ' ' + tmpl.name : '—';
+      document.getElementById('pass-wrap').innerHTML =
+        '<div style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.15);font-family:Inter,sans-serif;border:1px solid #e0e0e0">' +
+        '<div style="background:#0A0A0A;padding:18px 24px;display:flex;justify-content:space-between;align-items:center">' +
+        '<div>' +
+        '<div style="color:#FF6B2B;font-weight:800;font-size:1.1rem;letter-spacing:.08em">🛡️ SAFEENTRY PRO</div>' +
+        '<div style="color:#8B949E;font-size:.72rem;margin-top:3px;letter-spacing:.05em">SMART VISITOR MANAGEMENT SYSTEM</div>' +
+        '</div>' +
+        '<div style="text-align:right">' +
+        '<div style="color:#fff;font-size:.72rem;letter-spacing:.08em">VISITOR PASS</div>' +
+        '<div style="color:#FF6B2B;font-size:.68rem;margin-top:2px">AUTHORIZED ENTRY</div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="height:3px;background:linear-gradient(90deg,#FF6B2B,#FF8C42,#FFB347)"></div>' +
+        '<div style="padding:20px 24px;display:flex;gap:16px;align-items:flex-start;border-bottom:1px solid #f0f0f0;background:#fff">' +
+        '<div style="flex-shrink:0">' + selfieHtml + '</div>' +
+        '<div style="flex:1">' +
+        '<div style="font-size:1.3rem;font-weight:800;color:#111111;margin-bottom:3px">' + (v.name || '') + '</div>' +
+        '<div style="font-size:.75rem;color:#666;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">' + (v.visitorType || '') + '</div>' +
+        '<div style="font-size:.85rem;color:#FF6B2B;font-weight:600;margin-bottom:6px">' + (v.company || '') + '</div>' +
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        '<span style="background:#00D4AA;color:#000;font-size:.65rem;font-weight:800;padding:3px 8px;border-radius:99px">✅ Face ' + (v.faceMatch || 0) + '%</span>' +
+        '<span style="background:' + otpBadgeBg + ';color:#000;font-size:.65rem;font-weight:800;padding:3px 8px;border-radius:99px">' + otpBadgeText + '</span>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div style="padding:16px 24px;background:#fafafa;border-bottom:1px solid #f0f0f0">' +
+        '<div style="font-size:.68rem;font-weight:800;color:#FF6B2B;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #FF6B2B;display:inline-block">VISIT DETAILS</div>' +
+        '<div style="display:grid;grid-template-columns:120px 1fr;gap:8px 12px">' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Phone</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.phone || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Email</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.email || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Department</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.department || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Host Name</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.host || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Purpose</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.purpose || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Visit Date</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.date || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Time Slot</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + (v.timeSlot || '—') + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Industry</span>' +
+        '<span style="font-size:.78rem;color:#111;font-weight:500">' + industryText + '</span>' +
+        '<span style="font-size:.72rem;color:#999;font-weight:600;text-transform:uppercase;letter-spacing:.04em">Pass ID</span>' +
+        '<span style="font-size:.72rem;color:#FF6B2B;font-weight:700;font-family:monospace">' + visitId + '</span>' +
+        '</div>' +
+        '</div>' +
+        '<div style="padding:14px 24px;border-bottom:1px solid #f0f0f0;background:#fff">' +
+        '<div style="font-size:.68rem;font-weight:800;color:#FF6B2B;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #FF6B2B;display:inline-block">PERMITTED ZONES</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px">' + zonesHtml + '</div>' +
+        '</div>' +
+        '<div style="padding:20px 24px;text-align:center;background:#fafafa">' +
+        '<div style="font-size:.7rem;color:#999;text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;font-weight:700">🔍 SCAN TO VERIFY</div>' +
+        '<div id="qr-out" style="width:200px;height:200px;margin:0 auto;padding:10px;background:#fff;border-radius:10px;border:2px solid #FF6B2B;display:inline-block"></div>' +
+        '<div style="font-family:monospace;font-size:.65rem;color:#999;margin-top:10px">' + visitId + '</div>' +
+        '</div>' +
+        '<div style="background:#0A0A0A;padding:12px 24px;text-align:center">' +
+        '<div style="font-size:.68rem;color:#8B949E">This pass is valid for the date and time slot only. Present this at entry gate with Government ID.</div>' +
+        '<div style="color:#FF6B2B;font-size:.65rem;margin-top:4px;font-weight:600">SafeEntry Pro — Powered by AI</div>' +
+        '</div>' +
+        '</div>';
+
+
       setTimeout(() => {
         const c = document.getElementById('qr-out');
         if (c && typeof QRCode !== 'undefined') new QRCode(c, {
           text: qrData,
-          width: 180,
-          height: 180,
+          width: 220,
+          height: 220,
           colorDark: '#000000',
           colorLight: '#FFFFFF',
-          correctLevel: QRCode.CorrectLevel.H
+          correctLevel: QRCode.CorrectLevel.M
         });
       }, 100);
     }
@@ -5095,28 +5681,52 @@
 
       // Get QR as image
       try {
-        const qrDiv = document.getElementById('qr-out');
-        const qrCanvas = qrDiv ?
-          qrDiv.querySelector('canvas') : null;
-        const qrImg = qrDiv ?
-          qrDiv.querySelector('img') : null;
+        // Generate fresh QR for PDF
+        const tempDiv = document.createElement('div');
+        tempDiv.style.position = 'absolute';
+        tempDiv.style.left = '-9999px';
+        document.body.appendChild(tempDiv);
 
-        if (qrCanvas) {
-          const qrDataUrl = qrCanvas.toDataURL('image/png');
-          const qrX = (pageW - 50) / 2;
-          doc.addImage(qrDataUrl, 'PNG', qrX, y, 50, 50);
+        new QRCode(tempDiv, {
+          text: window._lastQrData || window.location.href + '?pass=' + (vData.backendId || vData.id || 'unknown'),
+          width: 256,
+          height: 256,
+          colorDark: '#000000',
+          colorLight: '#FFFFFF',
+          correctLevel: QRCode.CorrectLevel.M
+        });
+
+        await new Promise(r => setTimeout(r, 300));
+
+        const freshCanvas = tempDiv.querySelector('canvas');
+        const freshImg = tempDiv.querySelector('img');
+
+        let qrDataUrl = null;
+        if (freshCanvas) {
+          qrDataUrl = freshCanvas.toDataURL('image/png');
+        } else if (freshImg) {
+          qrDataUrl = freshImg.src;
+        }
+
+        document.body.removeChild(tempDiv);
+
+        if (qrDataUrl) {
+          const qrSize = 80;
+          const qrX = (pageW - qrSize) / 2;
+          doc.addImage(qrDataUrl, 'PNG', qrX, y, qrSize, qrSize);
           doc.setDrawColor(255, 107, 43);
-          doc.setLineWidth(0.5);
-          doc.rect(qrX, y, 50, 50);
-        } else if (qrImg) {
-          const qrX = (pageW - 50) / 2;
-          doc.addImage(qrImg.src, 'PNG', qrX, y, 50, 50);
+          doc.setLineWidth(0.8);
+          doc.rect(qrX - 2, y - 2, qrSize + 4, qrSize + 4);
+          y += 95;
+          console.log('✅ QR added to PDF');
+        } else {
+          console.log('❌ QR generation failed');
+          y += 10;
         }
       } catch (e) {
-        console.log('QR add error:', e);
+        console.log('QR PDF error:', e);
+        y += 10;
       }
-
-      y += 58;
 
       // Footer
       doc.setFillColor(26, 26, 26);
@@ -5134,33 +5744,73 @@
         pageW / 2, pageH - 6, { align: 'center' }
       );
 
+      // Check if QR is cut off — add new page if needed
+      if (y > 250) {
+        doc.addPage();
+        y = 20;
+      }
+
       doc.save(`SafeEntryPass_${v.backendId || v.id}.pdf`);
       toast('✅ PDF downloaded with photo + QR!', 'ok', 3000);
     }
 
-    function shareWA() {
+    async function shareWA() {
       const v = vData;
-      const visitId = v.backendId || v.id;
-      const txt = encodeURIComponent(
-        `🏭 *SAFEENTRY PRO — VISITOR PASS*
+      const visitId = v.backendId || v.id || 'N/A';
+      const selfie = v.selfieDataUrl || sessionStorage.getItem('selfieDataUrl') || '';
 
-👤 *Name:* ${v.name}
-🏢 *Company:* ${v.company}
-📱 *Phone:* ${v.phone}
-🏬 *Department:* ${v.department}
-👔 *Host:* ${v.host}
-🎯 *Purpose:* ${v.purpose || '—'}
-📅 *Date:* ${v.date}
-⏰ *Slot:* ${v.timeSlot}
+      // Get QR image from canvas
+      let qrImgData = '';
+      try {
+        const qrEl = document.getElementById('qr-out');
+        const qrImg = qrEl ? qrEl.querySelector('img') || qrEl.querySelector('canvas') : null;
+        if (qrImg) {
+          if (qrImg.tagName === 'IMG') {
+            qrImgData = qrImg.src;
+          } else if (qrImg.tagName === 'CANVAS') {
+            qrImgData = qrImg.toDataURL('image/png');
+          }
+        }
+      } catch (e) {
+        console.log('QR fetch error:', e);
+      }
+
+      // Build message with all visitor details
+      const msg = `🛡️ *SAFEENTRY PRO — VISITOR PASS*
+
+👤 *Name:* ${v.name || 'N/A'}
+🏢 *Company:* ${v.company || 'N/A'}
+📱 *Phone:* ${v.phone || 'N/A'}
+🏥 *Department:* ${v.department || 'N/A'}
+👔 *Host:* ${v.host || 'N/A'}
+🎯 *Purpose:* ${v.purpose || 'N/A'}
+📅 *Date:* ${v.date || 'N/A'}
+⏰ *Slot:* ${v.timeSlot || 'N/A'}
 🆔 *Pass ID:* ${visitId}
 ✅ *Face Verified:* ${v.faceMatch || 0}%
-🔐 *OTP Verified:* ${v.otpVerified ? 'Yes' : 'Pending'}
+📲 *OTP Verified:* ${v.otpVerified ? 'Yes' : 'No'}
 
-⚠️ Present this pass + Government ID at entry gate.
-_SafeEntry Pro — Smart Visitor Management_`
-      );
-      window.open(`https://wa.me/?text=${txt}`, '_blank');
-      toast('Opening WhatsApp...', 'ok', 2000);
+📌 Present this pass + Government ID at entry gate.
+_SafeEntry Pro — Smart Visitor Management_`;
+
+      // Try Web Share API with PDF
+      if (navigator.share) {
+        try {
+          // Generate PDF blob for sharing
+          const { jsPDF } = window.jspdf;
+          if (jsPDF) {
+            toast('📄 Preparing PDF for sharing...', 'info', 2000);
+            await downloadPass(true); // true = return blob
+          }
+        } catch (e) {
+          console.log('Share error:', e);
+        }
+      }
+
+      // Fallback — open WhatsApp with message
+      const waUrl = 'https://wa.me/?text=' + encodeURIComponent(msg);
+      window.open(waUrl, '_blank');
+      toast('📲 Opening WhatsApp...', 'ok', 2000);
     }
     function shareEmail() {
       const v = vData;
@@ -6983,6 +7633,17 @@ _SafeEntry Pro — Smart Visitor Management_`
       const tick = () => { ['guard-time', 'admin-time'].forEach(id => { const e = document.getElementById(id); if (e) e.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }); }); };
       tick(); setInterval(tick, 1000);
     });
+
+    function handleDownloadClick(labelEl) {
+      // Trigger actual PDF download
+      downloadPass();
+
+      // Reset checkbox after animation completes
+      setTimeout(() => {
+        const cb = labelEl.querySelector('.dl-input');
+        if (cb) cb.checked = false;
+      }, 4500);
+    }
   </script>
 </body>
 
