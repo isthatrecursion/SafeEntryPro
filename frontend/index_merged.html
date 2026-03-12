@@ -4300,10 +4300,10 @@
     }
 
     async function detectLiveness() {
-      if(!livenessState.detecting) return;
+      if (!livenessState.detecting) return;
 
       const vid = document.getElementById('vid-v3');
-      if(!vid || !window.faceModelsLoaded) {
+      if (!vid || !window.faceModelsLoaded) {
         console.log('⚠️ Models not loaded — auto passing');
         livenessPassedProceed();
         return;
@@ -4318,17 +4318,17 @@
             }))
           .withFaceLandmarks();
 
-        if(detection) {
+        if (detection) {
           const positions = detection.landmarks.positions;
 
           // Eye Aspect Ratio calculation
           function getEAR(eye) {
             const A = Math.hypot(
-              eye[1].x-eye[5].x, eye[1].y-eye[5].y);
+              eye[1].x - eye[5].x, eye[1].y - eye[5].y);
             const B = Math.hypot(
-              eye[2].x-eye[4].x, eye[2].y-eye[4].y);
+              eye[2].x - eye[4].x, eye[2].y - eye[4].y);
             const C = Math.hypot(
-              eye[0].x-eye[3].x, eye[0].y-eye[3].y);
+              eye[0].x - eye[3].x, eye[0].y - eye[3].y);
             return (A + B) / (2.0 * C);
           }
 
@@ -4336,36 +4336,36 @@
           const rightEye = positions.slice(42, 48);
           const ear = (getEAR(leftEye) + getEAR(rightEye)) / 2;
 
-          console.log('👁️ EAR:', ear.toFixed(3), 
+          console.log('👁️ EAR:', ear.toFixed(3),
             '| Blinks:', livenessState.blinkCount,
             '| EyeOpen:', livenessState.eyeOpen);
 
           // State machine for blink detection
-          if(ear < 0.25) {
+          if (ear < 0.25) {
             // Eye is closed
             livenessState.eyeOpen = false;
-          } else if(!livenessState.eyeOpen && ear > 0.28) {
+          } else if (!livenessState.eyeOpen && ear > 0.28) {
             // Eye just opened after being closed = 1 blink
             livenessState.eyeOpen = true;
             livenessState.blinkCount++;
-            console.log('✅ BLINK detected! Count:', 
+            console.log('✅ BLINK detected! Count:',
               livenessState.blinkCount);
 
             // Update UI
             document.getElementById('blink-hint')
-              .textContent = 
+              .textContent =
               `✅ Blink ${livenessState.blinkCount}/2`;
             updateLivenessProgress();
 
-            if(livenessState.blinkCount >= 2) {
+            if (livenessState.blinkCount >= 2) {
               // 2 blinks detected — auto capture!
               livenessState.detecting = false;
               livenessState.blinkDone = true;
               document.getElementById('blink-check')
                 .textContent = '✅';
-              toast('✅ 2 blinks detected — capturing face!', 
+              toast('✅ 2 blinks detected — capturing face!',
                 'ok', 2000);
-              
+
               // Update progress to 100%
               const bar = document.getElementById(
                 'liveness-bar');
@@ -4373,12 +4373,12 @@
                 'liveness-pct');
               const txt = document.getElementById(
                 'liveness-status-txt');
-              if(bar) { 
+              if (bar) {
                 bar.style.width = '100%';
                 bar.style.background = '#00D4AA';
               }
-              if(pctEl) pctEl.textContent = '100%';
-              if(txt) txt.textContent = 
+              if (pctEl) pctEl.textContent = '100%';
+              if (txt) txt.textContent =
                 '✅ Liveness verified!';
 
               // Wait 500ms then auto capture
@@ -4387,18 +4387,18 @@
               }, 500);
               return;
             }
-          } else if(ear > 0.28) {
+          } else if (ear > 0.28) {
             livenessState.eyeOpen = true;
           }
         } else {
           console.log('⚠️ No face in frame');
         }
-      } catch(e) {
+      } catch (e) {
         console.log('Liveness error:', e.message);
       }
 
       // Continue loop every 80ms
-      if(livenessState.detecting) {
+      if (livenessState.detecting) {
         setTimeout(detectLiveness, 80);
       }
     }
@@ -4410,16 +4410,16 @@
       const pctEl = document.getElementById('liveness-pct');
       const txt = document.getElementById(
         'liveness-status-txt');
-      if(bar) { 
+      if (bar) {
         bar.style.width = pct + '%';
-        bar.style.background = 
+        bar.style.background =
           pct === 100 ? '#00D4AA' : '#FF6B2B';
       }
-      if(pctEl) pctEl.textContent = pct + '%';
-      if(txt) txt.textContent = 
+      if (pctEl) pctEl.textContent = pct + '%';
+      if (txt) txt.textContent =
         pct === 0 ? 'Blink your eyes twice...' :
-        pct === 50 ? '✅ 1 blink — blink once more!' :
-        '✅ Liveness verified!';
+          pct === 50 ? '✅ 1 blink — blink once more!' :
+            '✅ Liveness verified!';
     }
 
     async function livenessPassedProceed() {
